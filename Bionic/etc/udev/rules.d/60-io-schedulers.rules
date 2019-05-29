@@ -1,0 +1,50 @@
+#
+# 60-io-schedulers.rules - DevOpsBroker configuration for disk I/O schedulers
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.1 LTS running kernel.osrelease = 4.15.0-45
+#
+# In order to set the default queue scheduler to kyber:
+#   o scsi_mod.use_blk_mq=1 is set on the GRUB_CMDLINE_LINUX_DEFAULT setting
+#     in /etc/default/grub
+#   o The kyber-iosched and bfq modules are loaded in /etc/modules
+# -----------------------------------------------------------------------------
+#
+
+# Default Disk I/O settings
+ACTION!="add", GOTO="io-schedulers-end"
+SUBSYSTEM!="block", GOTO="io-schedulers-end"
+
+# Disable kernel events polling by default
+KERNEL=="sd[a-z]|sr[0-9]", SUBSYSTEM=="block", ATTR{events_poll_msecs}="-1"
+
+# Add a generic rule for flash drives
+ACTION=="add", KERNEL=="sd[a-z]", SUBSYSTEM=="block", ATTRS{product}=="*Flash Drive*", ATTR{queue/rotational}="0"
+
+# Use kyber I/O scheduler for SATA SSD drives and set default read/write nanosecond latency values
+KERNEL=="sd[a-z]", SUBSYSTEM=="block", ATTR{queue/rotational}=="0", ATTR{queue/scheduler}="kyber"
+KERNEL=="sd[a-z]", SUBSYSTEM=="block", ATTR{queue/rotational}=="0", ATTR{queue/iosched/read_lat_nsec}="6357"
+KERNEL=="sd[a-z]", SUBSYSTEM=="block", ATTR{queue/rotational}=="0", ATTR{queue/iosched/write_lat_nsec}="6357"
+
+# Use BFQ I/O scheduler for SATA HDD drives
+KERNEL=="sd[a-z]", SUBSYSTEM=="block", ATTR{queue/rotational}=="1", ATTR{queue/scheduler}="bfq"
+
+# Use no scheduler for SATA CD-ROM/DVD-ROM drives and NVMe PCIe drives
+KERNEL=="sr[0-9]|nvme[0-9]n[0-9]", SUBSYSTEM=="block", ATTR{queue/scheduler}="none"
+
+LABEL="io-schedulers-end"

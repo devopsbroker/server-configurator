@@ -1,0 +1,51 @@
+#
+# disco.pref - DevOpsBroker configuration for /etc/apt/preferences.d/disco.pref
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# This APT preferences file is an example of how to backport select packages from
+# newer Ubuntu releases into older ones by using Pin-Priority.
+#
+# In this example packages are referenced from Ubuntu 19.04 Disco for Ubuntu
+# 18.04 Bionic.
+#
+# CRITICAL: You must use this file in conjunction with /etc/apt/sources.list.d/disco.list
+# in order for this to work properly:
+#
+# 1. Copy this file into the /etc/apt/preferences.d directory
+# 2. Copy the disco.list file into the /etc/apt/sources.list.d directory
+# 3. Modify this file according to whatever packages you want to backport into
+#    Bionic
+# 4. sudo apt update (pull Disco package information)
+# 5. Check if the package pinning policy worked
+#    - apt-cache policy sshguard (should be pointing to the Disco version)
+#    - apt-cache policy libc-bin (should be pointing to the Bionic version)
+# 6. Assuming package pinning is working, you will most likely need to test the
+#    install of the Disco package to look for any dependencies that also need
+#    to be backported. USE YOUR OWN DISCRETION as backporting a package like
+#    libc-bin will lay your Bionic install to waste.
+# 7. sudo pms test sshguard (performs a dry run without actually installing anything)
+# -----------------------------------------------------------------------------
+#
+
+Package: *
+Pin: release n=disco
+Pin-Priority: 10
+
+Package: sshguard
+Pin: release n=disco
+Pin-Priority: 500

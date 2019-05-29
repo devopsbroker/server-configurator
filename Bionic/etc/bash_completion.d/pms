@@ -1,0 +1,54 @@
+#!/bin/bash
+
+#
+# pms - DevOpsBroker Bash completion script for the pms utility
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-15
+#
+# -----------------------------------------------------------------------------
+#
+
+function _pms() {
+
+	COMPREPLY=()
+	local currentWord=${COMP_WORDS[COMP_CWORD]}
+	local afterCommandIndex=2
+
+	if [ ${COMP_WORDS[0]} == 'sudo' ]; then
+		afterCommandIndex=3
+	fi
+
+	# Exit if we have already completed the pms option
+	if [ $COMP_CWORD -eq $afterCommandIndex ]; then
+		if [ ${COMP_WORDS[1]} == 'install' ]; then
+			local files="$(/bin/ls ${currentWord}*)"
+
+			COMPREPLY=( $(compgen -W "${files}" -- ${currentWord}) )
+		fi
+
+		return 0
+	fi
+
+	local commands="add-repo autoremove depends full-upgrade info install list reconfigure refresh reinstall remove uninstall upgrade which"
+
+	COMPREPLY=( $(compgen -W "${commands}" -- ${currentWord}) )
+	return 0
+}
+
+complete -F _pms pms

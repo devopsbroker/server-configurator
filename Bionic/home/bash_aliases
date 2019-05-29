@@ -1,0 +1,121 @@
+#
+# bash_aliases - DevOpsBroker Bash initialization file for $HOME/.bash_aliases
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-15
+#
+# The ~/.bash_aliases file is sourced by the ~/.bashrc file. Use to define
+# aliases, environment variables, and functions every time you open a new
+# terminal window.
+#
+# See /usr/share/doc/bash-doc/examples in the bash-doc package for examples.
+#
+# Useful Linux Command-Line Utilities
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+# View all Bash complete configurations
+#   o complete -p
+#
+# View Bash completion configuration for a given command
+#   o complete -p vi
+# -----------------------------------------------------------------------------
+#
+
+############################ Environment Variables ############################
+
+# Ignore the .git directory
+export FIGNORE=".git"
+
+# Define colors for grep
+export GREP_COLORS="mt=1;92:fn=1;95:ln=1;93:se=1;96"
+
+# Define common flags for make
+export MAKEFLAGS="--jobs=$NUM_CPUS --no-print-directory --output-sync --silent"
+
+################################### Aliases ###################################
+
+# Enable color support of ls and also add handy aliases
+if [ -x /usr/bin/dircolors ]; then
+	/usr/bin/test -r ~/.dircolors && eval "$(/usr/bin/dircolors -b ~/.dircolors)" || eval "$(/usr/bin/dircolors -b)"
+
+	alias ls='/bin/ls -lh --color=always --group-directories-first'
+	alias la='/bin/ls -lha --color=always --group-directories-first'
+
+	alias grep='/bin/grep --color=always'
+	alias fgrep='/bin/fgrep --color=always'
+	alias egrep='/bin/egrep --color=always'
+else
+	alias ls='/bin/ls -lh --group-directories-first'
+	alias la='/bin/ls -lha --group-directories-first'
+
+	alias grep='/bin/grep'
+	alias fgrep='/bin/fgrep'
+	alias egrep='/bin/egrep'
+fi
+
+# Add an "alert" alias for long running commands.  Use like so:
+#   sleep 10; alert
+alias alert='notify-send --urgency=low -i "$([ $? = 0 ] && echo terminal || echo error)" "$(history|tail -n1|sed -e '\''s/^\s*[0-9]\+\s*//;s/[;&|]\s*alert$//'\'')"'
+
+# System command aliases
+alias ..='cd ..'
+alias addgroup='/usr/sbin/addgroup'
+alias adduser='/usr/sbin/adduser'
+alias apt='/usr/bin/apt'
+alias awk='/usr/bin/awk'
+alias cat='/bin/cat'
+alias chmod='/bin/chmod -c --preserve-root'
+alias chown='/bin/chown -c --preserve-root'
+alias cp='/bin/cp'
+alias dd='/bin/dd'
+alias df='/bin/df -Th --total'
+alias dig='/usr/bin/dig'
+alias du='/usr/bin/du -ach'
+alias free='/usr/bin/free -ht'
+alias gas='/usr/bin/gcc -Wall -g -S'
+alias gcc='/usr/bin/gcc -Wall -gdwarf -m64 -fdiagnostics-color=always'
+alias gedit='/usr/bin/gedit'
+alias gpg='/usr/bin/gpg'
+alias ifconfig='/sbin/ifconfig'
+alias ip='/sbin/ip'
+alias ld='/usr/bin/ld'
+alias make="/usr/bin/make $MAKEFLAGS"
+alias mkdir='/bin/mkdir -p'
+alias mv='/bin/mv'
+alias nasm='nasm -felf64 -gdwarf'
+alias numLines='/usr/bin/wc -l'
+alias openssl='/usr/bin/openssl'
+alias ping='/bin/ping'
+alias ps='/bin/ps auxf'
+alias remake="/usr/bin/make $MAKEFLAGS -B"
+alias rm='/bin/rm -I'
+alias root='/usr/bin/sudo -i'
+alias sed='/bin/sed -r'
+alias shred='/usr/bin/shred -uzn 0'
+alias snap='/usr/bin/snap'
+alias ssh='/usr/bin/ssh'
+alias sudo='/usr/bin/sudo TMPDIR=$TMPDIR '
+alias tar='/bin/tar'
+alias top='/usr/bin/htop'
+alias traceroute='/usr/bin/mtr'
+alias update-grub='/usr/sbin/update-grub'
+alias userctl='/bin/systemctl --user'
+alias vi='/usr/bin/vi'
+alias wget='/usr/bin/wget -c'
+alias which='/usr/bin/which'
+
+################################## Functions ##################################

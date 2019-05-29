@@ -1,0 +1,70 @@
+#
+# gitconfig - DevOpsBroker global configuration file for Git
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-15
+#
+# -----------------------------------------------------------------------------
+#
+
+[alias]
+	amend = commit --amend --no-edit
+	st = status
+	br = branch
+	cm = commit
+	co = checkout
+	di = diff
+	dc = diff --cached
+	ds = diff --staged
+	ignored = ls-files -o -i --exclude-standard
+	log = log --graph --decorate
+	logdiffs = log -p
+#	lol = log --graph --decorate --pretty=oneline --abbrev-commit
+#	lola = log --graph --decorate --pretty=oneline --abbrev-commit --all
+	ls = ls-files
+	stat = log --graph --decorate --stat
+
+[apply]
+	whitespace = nowarn
+
+[color]
+	ui = true
+
+[color "branch"]
+	current = yellow reverse
+	local = yellow
+	remote = green
+
+[color "diff"]
+	meta = yellow bold
+	frag = magenta bold
+	old = red bold
+	new = green bold
+	whitespace = red reverse
+
+[color "status"]
+	added = yellow
+	changed = green
+	untracked = cyan
+
+[core]
+	whitespace = fix,-indent-with-non-tab,trailing-space,cr-at-eol
+	autocrlf = input
+
+[credential]
+	helper = cache --timeout=7200

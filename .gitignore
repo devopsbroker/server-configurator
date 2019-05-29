@@ -50,3 +50,12 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Build artifacts
+**/build/pkg-debian/
+**/build/tar-test/
+
+# Whitelist files
+!.keep
+!makefile
+

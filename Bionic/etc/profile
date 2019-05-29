@@ -1,0 +1,51 @@
+#
+# profile - DevOpsBroker configuration file for /etc/profile
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-15
+#
+# System-wide .profile file for the Bourne shell (sh(1)) and Bourne compatible
+# shells (bash(1), ksh(1), ash(1), ...).
+#
+# When the login shell starts and reads its shell-specific configuration files,
+# bash first reads /etc/profile to get values that are defined for all users.
+# -----------------------------------------------------------------------------
+#
+
+if [ "${PS1-}" ]; then
+	if [ "${BASH-}" ] && [ "$BASH" != "/bin/sh" ]; then
+		# The file bash.bashrc already sets the default PS1.
+		# PS1='\h:\w\$ '
+		if [ -f /etc/bash.bashrc ]; then
+			source /etc/bash.bashrc
+		fi
+	elif [ "$(/usr/bin/id -u)" -eq 0 ]; then
+		PS1='# '
+	else
+		PS1='$ '
+	fi
+fi
+
+if [ -d /etc/profile.d ]; then
+	for i in /etc/profile.d/*.sh; do
+		if [ -r $i ]; then
+			source $i
+		fi
+	done
+	unset i
+fi

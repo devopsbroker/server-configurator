@@ -1,0 +1,51 @@
+#
+# bashrc - DevOpsBroker Bash initialization file for $HOME/.bashrc
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-15
+#
+# Normally the ~/.bashrc file is executed by bash(1) for interactive non-login
+# shells (e.g. new Terminal window).
+#
+# However, on an Ubuntu Server it is sourced in ~/.profile which is executed on
+# login (i.e. console / telnet / ssh).
+#
+# See /usr/share/doc/bash/examples/startup-files (in the package bash-doc) for
+# examples.
+# -----------------------------------------------------------------------------
+#
+
+# If set, the pattern "**" used in a pathname expansion context will match all
+# files and zero or more directories and subdirectories
+#shopt -s globstar
+
+# Make less more friendly for non-text input files, see lesspipe(1)
+[ -x /usr/bin/lesspipe ] && eval "$(SHELL=/bin/sh lesspipe)"
+
+# Colored GCC warnings and errors
+export GCC_COLORS='error=01;31:warning=01;35:note=01;36:caret=01;32:locus=01:quote=01'
+
+# Alias definitions
+if [ -f ~/.bash_aliases ]; then
+	source ~/.bash_aliases
+fi
+
+# Personal definitions
+if [ -f ~/.bash_personal ]; then
+	source ~/.bash_personal
+fi

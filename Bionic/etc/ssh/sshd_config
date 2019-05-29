@@ -1,0 +1,117 @@
+#
+# sshd_config - DevOpsBroker configuration for the sshd server
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-16
+#
+# This is the sshd server system-wide configuration file.  See sshd_config(5)
+# for more information.
+#
+# The strategy used for options in the default sshd_config shipped with
+# OpenSSH is to specify options with their default value where possible, but
+# leave them commented.  Uncommented options override the default value.
+# -----------------------------------------------------------------------------
+#
+
+#Port 22
+#AddressFamily any                                         # (inet, inet6)
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+
+#HostKey /etc/ssh/ssh_host_rsa_key
+#HostKey /etc/ssh/ssh_host_ecdsa_key
+#HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Ciphers and keying
+#RekeyLimit default none
+
+# Logging
+#SyslogFacility AUTH
+#LogLevel INFO
+
+# Authentication
+
+AuthenticationMethods=publickey                            # (any, gssapi-with-mic, hostbased, keyboard-interactive, none, password)
+#AuthorizedKeysCommand none
+#AuthorizedKeysCommandUser nobody
+#AuthorizedKeysFile	.ssh/authorized_keys .ssh/authorized_keys2
+#AuthorizedPrincipalsFile none
+ChallengeResponseAuthentication no
+HostbasedAuthentication no
+IgnoreRhosts yes
+IgnoreUserKnownHosts no
+#LoginGraceTime 2m
+MaxAuthTries 3
+MaxSessions 6
+PasswordAuthentication no
+PermitEmptyPasswords no
+PermitRootLogin no                                         # (yes, prohibit-password, without-password, forced-commands-only)
+PubkeyAuthentication yes
+#StrictModes yes
+UseDNS no                                                  # Prevent reverse DNS lookups
+UsePAM no
+
+# Kerberos options
+KerberosAuthentication no
+#KerberosOrLocalPasswd yes
+#KerberosTicketCleanup yes
+#KerberosGetAFSToken no
+
+# GSSAPI options
+GSSAPIAuthentication no
+#GSSAPICleanupCredentials yes
+#GSSAPIStrictAcceptorCheck yes
+#GSSAPIKeyExchange no
+
+#AllowAgentForwarding yes
+#AllowTcpForwarding yes
+#GatewayPorts no
+X11Forwarding no
+#X11DisplayOffset 10
+#X11UseLocalhost yes
+#PermitTTY yes
+PrintMotd no
+#PrintLastLog yes
+#TCPKeepAlive yes
+#UseLogin no
+#PermitUserEnvironment no
+Compression yes
+#ClientAliveInterval 0
+#ClientAliveCountMax 3
+#UseDNS no
+#PidFile /var/run/sshd.pid
+#MaxStartups 10:30:100
+#PermitTunnel no
+#ChrootDirectory none
+#VersionAddendum none
+
+# no default banner path
+#Banner none
+
+# Allow client to pass locale environment variables
+AcceptEnv LANG LC_*
+
+# override default of no subsystems
+Subsystem	sftp	/usr/lib/openssh/sftp-server
+
+# Example of overriding settings on a per-user basis
+#Match User anoncvs
+#	X11Forwarding no
+#	AllowTcpForwarding no
+#	PermitTTY no
+#	ForceCommand cvs server

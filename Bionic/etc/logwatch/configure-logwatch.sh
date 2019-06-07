@@ -67,7 +67,12 @@ fi
 
 ################################## Variables ##################################
 
+## Bash exec variables
+EXEC_HOSTNAME=/bin/hostname
+EXEC_NEWALIASES=/usr/bin/newaliases
+
 ## Variables
+HOST_FQDN="$($EXEC_HOSTNAME --fqdn)"
 YEAR=$($EXEC_DATE +'%Y')
 EMAIL_ADDRESS=''
 
@@ -80,21 +85,19 @@ fi
 
 printBox "DevOpsBroker $UBUNTU_RELEASE LogWatch Configurator" 'true'
 
-# Exit if /usr/share/logwatch/default.conf/logwatch.conf already configured
-set +o errexit
-if [ -f /usr/share/logwatch/default.conf/logwatch.conf ] && [ "$( $EXEC_GREP -F --max-count=1 'DevOpsBroker' /usr/share/logwatch/default.conf/logwatch.conf )" ] && [ "${1:-}" != '-f' ]; then
-	printInfo '/usr/share/logwatch/default.conf/logwatch.conf already configured'
+# Exit if /etc/logwatch/conf/logwatch.conf already configured
+if [ -f /etc/logwatch/conf/logwatch.conf ] && [ "${1:-}" != '-f' ]; then
+	printInfo '/etc/logwatch/conf/logwatch.conf already configured'
 	echo
 	printUsage "$SCRIPT_EXEC ${gold}[-f]"
 
 	echo ${bold}
 	echo "Valid Options:${romantic}"
-	echo -e ${gold}'  -f\t'  ${romantic}'Force /usr/share/logwatch/default.conf/logwatch.conf reconfiguration'
+	echo -e ${gold}'  -f\t'  ${romantic}'Force /etc/logwatch/conf/logwatch.conf reconfiguration'
 	echo ${reset}
 
 	exit 0
 fi
-set -o errexit
 
 #
 # Configure MailTo email address
@@ -109,12 +112,21 @@ done
 echo
 
 #
-# Generate logwatch.conf
+# Backup /etc/logwatch/conf/logwatch.conf
 #
 
-printInfo 'Generating /usr/share/logwatch/default.conf/logwatch.conf'
+if [ -f /etc/logwatch/conf/logwatch.conf ]; then
+	printInfo 'Backing up /etc/logwatch/conf/logwatch.conf'
+	$EXEC_CP --archive /etc/logwatch/conf/logwatch.conf /etc/logwatch/conf/logwatch.conf.bak
+fi
 
-/bin/cat << EOF > /usr/share/logwatch/default.conf/logwatch.conf
+#
+# Generate /etc/logwatch/conf/logwatch.conf
+#
+
+printInfo 'Generating /etc/logwatch/conf/logwatch.conf'
+
+/bin/cat << EOF > /etc/logwatch/conf/logwatch.conf
 #
 # logwatch.conf - DevOpsBroker configuration for LogWatch
 #
@@ -151,7 +163,7 @@ printInfo 'Generating /usr/share/logwatch/default.conf/logwatch.conf'
 LogDir = /var/log
 
 # You can override the default temp directory (/tmp) here
-TmpDir = /var/cache/logwatch
+TmpDir = /tmp
 
 # Output/Format Options
 Output = mail                                              # (stdout, file)
@@ -226,7 +238,7 @@ Service = All
 # stream.
 # TODO test variables in the mailer string to see if the To/From/Subject can be set
 # From here with out breaking anything. This would allow mail/mailx/nail etc..... -mgt
-mailer = "/usr/sbin/sendmail -t"
+mailer = "/usr/sbin/sendmail ${EMAIL_ADDRESS}"
 
 #
 # With this option set to a comma separted list of hostnames, only log entries
@@ -242,6 +254,157 @@ mailer = "/usr/sbin/sendmail -t"
 #HostLimit = myhost
 
 EOF
+
+#
+# Configure /etc/aliases
+#
+
+if [ -f /etc/aliases ]; then
+	# Backup /etc/aliases
+	printInfo 'Backing up /etc/aliases'
+
+	if [ ! -d /etc/backup ]; then
+		$EXEC_MKDIR --parents /etc/backup
+	fi
+
+	$EXEC_CP --archive /etc/aliases /etc/backup/aliases
+fi
+
+# Generate /etc/aliases
+printInfo 'Generating /etc/aliases'
+
+/bin/cat << EOF > /etc/aliases
+#
+# aliases - DevOpsBroker configuration for Postfix local alias database
+#
+# Copyright (C) $YEAR Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-16
+#
+# See man 5 aliases for format
+# -----------------------------------------------------------------------------
+#
+postmaster:    root
+root: ${EMAIL_ADDRESS}
+
+EOF
+
+# Initialize the alias database
+printInfo 'Intializing the Postfix alias database'
+$EXEC_NEWALIASES
+
+#
+# Configure /etc/postfix/main.cf
+#
+
+if [ -f /etc/postfix/main.cf ]; then
+	# Backup /etc/postfix/main.cf
+	printInfo 'Backing up /etc/postfix/main.cf'
+
+	$EXEC_CP --archive /etc/postfix/main.cf /etc/postfix/main.cf.bak
+fi
+
+# Generate /etc/postfix/main.cf
+printInfo 'Generating /etc/postfix/main.cf'
+
+/bin/cat << EOF > /etc/postfix/main.cf
+#
+# main.cf - DevOpsBroker configuration for Postfix localhost relay server
+#
+# Copyright (C) $YEAR Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-16
+#
+# See /usr/share/postfix/main.cf.dist for a commented, more complete version
+# -----------------------------------------------------------------------------
+#
+
+# Debian specific:  Specifying a file name will cause the first line of that
+# file to be used as the name.  The Debian default is /etc/mailname
+#myorigin = /etc/mailname
+
+smtpd_banner = $myhostname ESMTP $mail_name (Ubuntu)
+biff = no
+
+# appending .domain is the MUA's job
+append_dot_mydomain = no
+
+# Uncomment the next line to generate "delayed mail" warnings
+#delay_warning_time = 4h
+
+readme_directory = no
+
+# See http://www.postfix.org/COMPATIBILITY_README.html -- default to 2 on
+# fresh installs.
+compatibility_level = 2
+
+# TLS parameters
+smtpd_tls_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem
+smtpd_tls_key_file=/etc/ssl/private/ssl-cert-snakeoil.key
+smtpd_use_tls=yes
+smtpd_tls_session_cache_database = btree:${data_directory}/smtpd_scache
+smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+
+# See /usr/share/doc/postfix/TLS_README.gz in the postfix-doc package for
+# information on enabling SSL in the smtp client.
+
+smtpd_relay_restrictions = permit_mynetworks permit_sasl_authenticated defer_unauth_destination
+myhostname = ${HOST_FQDN}
+alias_maps = hash:/etc/aliases
+alias_database = hash:/etc/aliases
+myorigin = /etc/mailname
+mydestination = localhost
+relayhost = [smtp.gmail.com]:587
+mynetworks = 127.0.0.0/8 [::ffff:127.0.0.0]/104 [::1]/128
+mailbox_size_limit = 0
+recipient_delimiter = +
+inet_interfaces = localhost
+inet_protocols = all
+
+# Enable SASL authentication
+smtp_sasl_auth_enable = yes
+# Disallow methods that allow anonymous authentication
+smtp_sasl_security_options = noanonymous
+# Location of sasl_passwd
+smtp_sasl_password_maps = hash:/etc/postfix/sasl/sasl_passwd
+# Enable STARTTLS encryption
+smtp_tls_security_level = encrypt
+# Location of CA certificates
+smtp_tls_CAfile = /etc/ssl/certs/ca-certificates.crt
+
+EOF
+
+# Restart Postfix service
+printInfo 'Restarting Postfix service'
+$EXEC_SYSTEMCTL restart postfix.service
 
 echo
 

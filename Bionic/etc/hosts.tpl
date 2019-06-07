@@ -29,6 +29,7 @@
 set -o errexit                 # Exit if any statement returns a non-true value
 set -o nounset                 # Exit if use an uninitialised variable
 set -o pipefail                # Exit if any statement in a pipeline returns a non-true value
+IFS=$'\n\t'                    # Default the Internal Field Separator to newline and tab
 
 ################################## Functions ##################################
 
@@ -38,13 +39,17 @@ set -o pipefail                # Exit if any statement in a pipeline returns a n
 # -----------------------------------------------------------------------------
 function getHostname() {
 	local fqdnHostname="$($EXEC_HOSTNAME --fqdn)"
-	local hostname="$($EXEC_HOSTNAME)"
+	local hostAlias=''
 
-	if [ "$hostname" == "$fqdnHostname" ]; then
-		echo "$hostname"
-	else
-		echo "$fqdnHostname $hostname"
-	fi
+	read -p "${bold}${green}What is the FQDN of the server?: ${reset}" -i "$fqdnHostname" -e fqdnHostname
+
+	while [ -z "$fqdnHostname" ]; do
+		read -p "${bold}${green}What is the FQDN of the server?: ${reset}" -i "$fqdnHostname" -e fqdnHostname
+	done
+
+	IFS='.'; hostAlias=($fqdnHostname); IFS=$'\n\t'
+
+	echo "$fqdnHostname ${hostAlias[0]}"
 }
 
 ################################## Variables ##################################

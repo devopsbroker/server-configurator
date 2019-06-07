@@ -418,6 +418,12 @@ installPackage '/usr/sbin/sshd' 'openssh-server'
 # Install openssh-sftp-server
 installPackage '/usr/lib/openssh/sftp-server' 'openssh-sftp-server'
 
+# Install postfix
+installPackage '/usr/sbin/postfix' 'postfix'
+
+# Install sendmail
+installPackage '/usr/sbin/sendmail' 'sendmail'
+
 # Install sshguard
 installPackage '/usr/sbin/sshguard' 'sshguard'
 

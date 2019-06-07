@@ -203,6 +203,9 @@ createSymlink /usr/local/sbin/configure-apt-mirror "$INSTALL_DIR"/etc/apt/config
 # Make symlink to etc/default/configure-grub.sh
 createSymlink /usr/local/sbin/configure-grub "$INSTALL_DIR"/etc/default/configure-grub.sh
 
+# Make symlink to etc/logwatch/configure-logwatch.sh
+createSymlink /usr/local/sbin/configure-logwatch "$INSTALL_DIR"/etc/logwatch/configure-logwatch.sh
+
 # Make symlink to etc/netplan/configure-netplan.sh
 createSymlink /usr/local/sbin/configure-netplan "$INSTALL_DIR"/etc/netplan/configure-netplan.sh
 
@@ -235,9 +238,6 @@ createSymlink /usr/local/sbin/configure-unbound "$INSTALL_DIR"/etc/unbound/confi
 
 # Make symlink to home/configure-user.sh
 createSymlink /usr/local/sbin/configure-user "$INSTALL_DIR"/home/configure-user.sh
-
-# Make symlink to usr/share/logwatch/default.conf/configure-logwatch.sh
-createSymlink /usr/local/sbin/configure-logwatch "$INSTALL_DIR"/usr/share/logwatch/default.conf/configure-logwatch.sh
 
 # Create /etc/devops directory
 if [ ! -d /etc/devops ]; then

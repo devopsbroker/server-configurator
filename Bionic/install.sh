@@ -156,6 +156,7 @@ printBanner "Copying files to $INSTALL_DIR/"
 /bin/cp -ruv --preserve=timestamps "$SCRIPT_DIR"/doc "$INSTALL_DIR"
 /bin/cp -ruv --preserve=timestamps "$SCRIPT_DIR"/etc "$INSTALL_DIR"
 /bin/cp -ruv --preserve=timestamps "$SCRIPT_DIR"/home "$INSTALL_DIR"
+/bin/cp -ruv --preserve=timestamps "$SCRIPT_DIR"/services "$INSTALL_DIR"
 /bin/cp -ruvL --preserve=timestamps "$SCRIPT_DIR"/usr "$INSTALL_DIR"
 
 echo
@@ -238,6 +239,9 @@ createSymlink /usr/local/sbin/configure-unbound "$INSTALL_DIR"/etc/unbound/confi
 
 # Make symlink to home/configure-user.sh
 createSymlink /usr/local/sbin/configure-user "$INSTALL_DIR"/home/configure-user.sh
+
+# Make symlink to services/install-httpd.sh
+createSymlink /usr/local/sbin/install-httpd "$INSTALL_DIR"/services/install-httpd.sh
 
 # Create /etc/devops directory
 if [ ! -d /etc/devops ]; then

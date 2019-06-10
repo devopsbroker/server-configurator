@@ -262,86 +262,86 @@ $IPSET -t raw -A spoofed_ips 169.254.0.0/16    # Link-local
 
 # Snooped Ports Bitmap
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N snooped_ports bitmap:port range 1-10240
-$IPSET -t raw -A snooped_ports 20           # Passive FTP
-$IPSET -t raw -A snooped_ports 21           # FTP
-$IPSET -t raw -A snooped_ports 23           # Telnet
-$IPSET -t raw -A snooped_ports 25           # SMTP
-$IPSET -t raw -A snooped_ports 53           # DNS
-$IPSET -t raw -A snooped_ports 67           # DHCP Server
-$IPSET -t raw -A snooped_ports 68           # DHCP Client
-$IPSET -t raw -A snooped_ports 69           # TFTP
-$IPSET -t raw -A snooped_ports 80           # HTTP
-$IPSET -t raw -A snooped_ports 107          # Remote Telnet
-$IPSET -t raw -A snooped_ports 109          # POP2
-$IPSET -t raw -A snooped_ports 110          # POP3
-$IPSET -t raw -A snooped_ports 111          # RPC
-$IPSET -t raw -A snooped_ports 113          # IDENT
-$IPSET -t raw -A snooped_ports 115          # SFTP
-$IPSET -t raw -A snooped_ports 135          # Microsoft RPC
-$IPSET -t raw -A snooped_ports 137          # NetBIOS Name Service
-$IPSET -t raw -A snooped_ports 138          # NetBIOS Datagram Service
-$IPSET -t raw -A snooped_ports 139          # NetBIOS Session Service
-$IPSET -t raw -A snooped_ports 143          # IMAP
-$IPSET -t raw -A snooped_ports 161          # SNMP
-$IPSET -t raw -A snooped_ports 162          # SNMP Traps
-$IPSET -t raw -A snooped_ports 177          # XDMCP
-$IPSET -t raw -A snooped_ports 194          # IRC
-$IPSET -t raw -A snooped_ports 199          # SNMP Multiplexer
-$IPSET -t raw -A snooped_ports 220          # IMAP3
-$IPSET -t raw -A snooped_ports 371          # ClearCase
-$IPSET -t raw -A snooped_ports 389          # LDAP
-$IPSET -t raw -A snooped_ports 443          # HTTPS
-$IPSET -t raw -A snooped_ports 445          # SMB
-$IPSET -t raw -A snooped_ports 465          # SSL/TLS SMTP
-$IPSET -t raw -A snooped_ports 500          # IPsec IKE
-$IPSET -t raw -A snooped_ports 513          # Rlogin
-$IPSET -t raw -A snooped_ports 514          # RSH / RCP
-$IPSET -t raw -A snooped_ports 530          # RPC
-$IPSET -t raw -A snooped_ports 546          # DHCPV6 Client
-$IPSET -t raw -A snooped_ports 547          # DHCPV6 Server
-$IPSET -t raw -A snooped_ports 631          # IPP
-$IPSET -t raw -A snooped_ports 636          # SSL/TLS LDAP
-$IPSET -t raw -A snooped_ports 873          # rsync
-$IPSET -t raw -A snooped_ports 989          # SSL/TLS FTP (Data)
-$IPSET -t raw -A snooped_ports 990          # SSL/TLS FTP
-$IPSET -t raw -A snooped_ports 992          # SSL/TLS Telnet
-$IPSET -t raw -A snooped_ports 993          # SSL/TLS IMAP
-$IPSET -t raw -A snooped_ports 994          # SSL/TLS IRC
-$IPSET -t raw -A snooped_ports 995          # SSL/TLS POP3
-$IPSET -t raw -A snooped_ports 1024-1030    # Microsoft Windows Crap
-$IPSET -t raw -A snooped_ports 1099         # Java RMI Registry
-$IPSET -t raw -A snooped_ports 1194         # OpenVPN
-$IPSET -t raw -A snooped_ports 1352         # Lotus Note
-$IPSET -t raw -A snooped_ports 1433         # Microsoft SQL Server
-$IPSET -t raw -A snooped_ports 1434         # Microsoft SQL Monitor
-$IPSET -t raw -A snooped_ports 1863         # MSN Messenger
-$IPSET -t raw -A snooped_ports 2000         # Cisco SCCP
-$IPSET -t raw -A snooped_ports 2049         # NFS
-$IPSET -t raw -A snooped_ports 2401         # CVS
-$IPSET -t raw -A snooped_ports 3130         # ICP
-$IPSET -t raw -A snooped_ports 3289         # ENPC
-$IPSET -t raw -A snooped_ports 3306         # MySQL
-$IPSET -t raw -A snooped_ports 3690         # SVN
-$IPSET -t raw -A snooped_ports 4500         # IPsec NAT Traversal
-$IPSET -t raw -A snooped_ports 4827         # HTCP
-$IPSET -t raw -A snooped_ports 5050         # Yahoo! Messenger
-$IPSET -t raw -A snooped_ports 5190         # AIM
-$IPSET -t raw -A snooped_ports 5222         # Jabber Client
-$IPSET -t raw -A snooped_ports 5269         # Jabber Server
-$IPSET -t raw -A snooped_ports 5353         # mDNS
-$IPSET -t raw -A snooped_ports 5432         # PostgreSQL
-$IPSET -t raw -A snooped_ports 6000-6007    # X11
-$IPSET -t raw -A snooped_ports 6446         # MySQL Proxy
-$IPSET -t raw -A snooped_ports 8080         # Tomcat
-$IPSET -t raw -A snooped_ports 8610         # Canon MFNP
-$IPSET -t raw -A snooped_ports 8612         # Canon MFNP
-$IPSET -t raw -A snooped_ports 9418         # Git
+$IPSET create snooped_ports bitmap:port range 1-10240
+$IPSET add snooped_ports 20           # Passive FTP
+$IPSET add snooped_ports 21           # FTP
+$IPSET add snooped_ports 23           # Telnet
+$IPSET add snooped_ports 25           # SMTP
+$IPSET add snooped_ports 53           # DNS
+$IPSET add snooped_ports 67           # DHCP Server
+$IPSET add snooped_ports 68           # DHCP Client
+$IPSET add snooped_ports 69           # TFTP
+$IPSET add snooped_ports 80           # HTTP
+$IPSET add snooped_ports 107          # Remote Telnet
+$IPSET add snooped_ports 109          # POP2
+$IPSET add snooped_ports 110          # POP3
+$IPSET add snooped_ports 111          # RPC
+$IPSET add snooped_ports 113          # IDENT
+$IPSET add snooped_ports 115          # SFTP
+$IPSET add snooped_ports 135          # Microsoft RPC
+$IPSET add snooped_ports 137          # NetBIOS Name Service
+$IPSET add snooped_ports 138          # NetBIOS Datagram Service
+$IPSET add snooped_ports 139          # NetBIOS Session Service
+$IPSET add snooped_ports 143          # IMAP
+$IPSET add snooped_ports 161          # SNMP
+$IPSET add snooped_ports 162          # SNMP Traps
+$IPSET add snooped_ports 177          # XDMCP
+$IPSET add snooped_ports 194          # IRC
+$IPSET add snooped_ports 199          # SNMP Multiplexer
+$IPSET add snooped_ports 220          # IMAP3
+$IPSET add snooped_ports 371          # ClearCase
+$IPSET add snooped_ports 389          # LDAP
+$IPSET add snooped_ports 443          # HTTPS
+$IPSET add snooped_ports 445          # SMB
+$IPSET add snooped_ports 465          # SSL/TLS SMTP
+$IPSET add snooped_ports 500          # IPsec IKE
+$IPSET add snooped_ports 513          # Rlogin
+$IPSET add snooped_ports 514          # RSH / RCP
+$IPSET add snooped_ports 530          # RPC
+$IPSET add snooped_ports 546          # DHCPV6 Client
+$IPSET add snooped_ports 547          # DHCPV6 Server
+$IPSET add snooped_ports 631          # IPP
+$IPSET add snooped_ports 636          # SSL/TLS LDAP
+$IPSET add snooped_ports 873          # rsync
+$IPSET add snooped_ports 989          # SSL/TLS FTP (Data)
+$IPSET add snooped_ports 990          # SSL/TLS FTP
+$IPSET add snooped_ports 992          # SSL/TLS Telnet
+$IPSET add snooped_ports 993          # SSL/TLS IMAP
+$IPSET add snooped_ports 994          # SSL/TLS IRC
+$IPSET add snooped_ports 995          # SSL/TLS POP3
+$IPSET add snooped_ports 1024-1030    # Microsoft Windows Crap
+$IPSET add snooped_ports 1099         # Java RMI Registry
+$IPSET add snooped_ports 1194         # OpenVPN
+$IPSET add snooped_ports 1352         # Lotus Note
+$IPSET add snooped_ports 1433         # Microsoft SQL Server
+$IPSET add snooped_ports 1434         # Microsoft SQL Monitor
+$IPSET add snooped_ports 1863         # MSN Messenger
+$IPSET add snooped_ports 2000         # Cisco SCCP
+$IPSET add snooped_ports 2049         # NFS
+$IPSET add snooped_ports 2401         # CVS
+$IPSET add snooped_ports 3130         # ICP
+$IPSET add snooped_ports 3289         # ENPC
+$IPSET add snooped_ports 3306         # MySQL
+$IPSET add snooped_ports 3690         # SVN
+$IPSET add snooped_ports 4500         # IPsec NAT Traversal
+$IPSET add snooped_ports 4827         # HTCP
+$IPSET add snooped_ports 5050         # Yahoo! Messenger
+$IPSET add snooped_ports 5190         # AIM
+$IPSET add snooped_ports 5222         # Jabber Client
+$IPSET add snooped_ports 5269         # Jabber Server
+$IPSET add snooped_ports 5353         # mDNS
+$IPSET add snooped_ports 5432         # PostgreSQL
+$IPSET add snooped_ports 6000-6007    # X11
+$IPSET add snooped_ports 6446         # MySQL Proxy
+$IPSET add snooped_ports 8080         # Tomcat
+$IPSET add snooped_ports 8610         # Canon MFNP
+$IPSET add snooped_ports 8612         # Canon MFNP
+$IPSET add snooped_ports 9418         # Git
 
 # Service Ports Bitmap
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N tcp_service_ports bitmap:port range 1-10240
-$IPSET -t raw -A tcp_service_ports 22       # SSH
+$IPSET create tcp_service_ports bitmap:port range 1-10240
+$IPSET add tcp_service_ports 22       # SSH
 
 #
 # ══════════════════════ Configure RAW PREROUTING Chain ═══════════════════════

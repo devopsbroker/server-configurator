@@ -244,6 +244,8 @@ if [ ! -d /usr/local/sbin/services ]; then
 	echoOnExit=true
 fi
 
+installService 'httpd'
+
 installService 'smbd'
 
 installService 'smtp-client'

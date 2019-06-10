@@ -90,4 +90,6 @@ printBanner "Staging server-configurator to $sharedFolder"
 
 $EXEC_CP -LRuv --preserve=all "$SCRIPT_DIR/." "$sharedFolder"
 
+echo
+
 exit 0

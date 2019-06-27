@@ -39,6 +39,7 @@ set -o pipefail                # Exit if any statement in a pipeline returns a n
 ## Bash exec variables
 IPTABLES_RESTORE=/sbin/iptables-restore
 IP6TABLES_RESTORE=/sbin/ip6tables-restore
+IPSET=/sbin/ipset
 EXEC_SYSCTL=/sbin/sysctl
 
 ## Variables
@@ -47,15 +48,30 @@ NF_CONNTRACK_EXPECT_MAX=''
 
 ################################### Actions ###################################
 
+# Restore IPSet configuration
+if [ -f /etc/network/ipset.conf ]; then
+	# Check to see if IPSet has already been loaded
+	set +o errexit
+
+	$IPSET test tcp_service_ports 22
+
+	if [ $? -ne 0 ]; then
+		/usr/bin/logger -p syslog.notice -i [ipset-restore] Loading /etc/network/ipset.conf configuration;
+		$IPSET restore -file /etc/network/ipset.conf
+	fi
+
+	set -o errexit
+fi
+
 # Restore IPv4 iptables firewall rules
 if [ -f /etc/network/iptables.rules ]; then
-	/usr/bin/logger -p syslog.notice -i [iptables-restore] Loading /etc/network/iptables.rules rules;
+	/usr/bin/logger -p syslog.notice -i [iptables-restore] Loading /etc/network/iptables.rules;
 	$IPTABLES_RESTORE < /etc/network/iptables.rules
 fi
 
 # Restore IPv6 ip6tables firewall rules
 if [ -f /etc/network/ip6tables.rules ]; then
-	/usr/bin/logger -p syslog.notice -i [iptables-restore] Loading /etc/network/ip6tables.rules rules;
+	/usr/bin/logger -p syslog.notice -i [ip6tables-restore] Loading /etc/network/ip6tables.rules;
 	$IP6TABLES_RESTORE < /etc/network/ip6tables.rules
 fi
 

@@ -204,7 +204,7 @@ fi
 if [ "$echoOnExit" == 'true' ]; then
 	echo
 else
-	printInfo '/etc/sysctl.conf already configured'
+	printNotice $SCRIPT_EXEC '/etc/sysctl.conf already configured'
 	echo
 	printUsage "$SCRIPT_EXEC ${gold}[-f]"
 

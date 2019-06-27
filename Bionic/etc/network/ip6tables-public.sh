@@ -104,11 +104,10 @@ fi
 ## Bash exec variables
 IP6TABLES=/sbin/ip6tables
 IP6TABLES_SAVE=/sbin/ip6tables-save
-IPSET=/sbin/ipset
 EXEC_DERIVESUBNET=/usr/local/bin/derivesubnet
 
 ## Options
-NIC="$1"
+NIC="${1:-}"
 
 ## IPv6 Address Scopes
 IPv6_ADDRESS_GLOBAL=''
@@ -121,7 +120,7 @@ IPv6_SUBNET_LOCAL='fe80::/64'
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if [ -z "$NIC" ]; then
-	mapfile -t ethList < <($EXEC_IP -br -6 addr show | $EXEC_GREP -Eo '^enp[a-z0-9]+')
+	mapfile -t ethList < <($EXEC_IP -br -6 addr show | $EXEC_GREP -Eo '^e[a-z0-9]+')
 
 	if [ ${#ethList[@]} -eq 1 ]; then
 		ethInterface=(${ethList[0]})
@@ -147,7 +146,17 @@ else
 	fi
 fi
 
+# Make sure server has IPv6 networking configured before continuing
+set +o errexit
+
 ethInfo=( $($EXEC_DERIVESUBNET -6 $NIC) )
+
+if [ $? -ne 0 ]; then
+	printNotice $SCRIPT_EXEC "This server does not have IPv6 networking enabled"
+	exit 0
+fi
+
+set -o errexit
 
 IPv6_ADDRESS_GLOBAL=${ethInfo[0]}
 IPv6_ADDRESS_LOCAL=${ethInfo[1]}
@@ -178,8 +187,6 @@ printInfo 'Initializing RAW Table'
 $IP6TABLES -t raw -P OUTPUT ACCEPT
 $IP6TABLES -t raw -F
 $IP6TABLES -t raw -X
-$IPSET -t raw -F
-$IPSET -t raw -X
 
 printInfo 'Initializing MANGLE Table'
 $IP6TABLES -t mangle -P INPUT ACCEPT
@@ -252,95 +259,8 @@ $IP6TABLES -t raw -A do_not_track -j ACCEPT
 # Ban Client / Rate limit logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 $IP6TABLES -t raw -N ban_client
-$IP6TABLES -t raw -A ban_client -j SET --add-set banned_clients src
+$IP6TABLES -t raw -A ban_client -j SET --add-set banned_clients_ipv6 src
 $IP6TABLES -t raw -A ban_client -j ban_client_drop
-
-# Banned Clients IP Hashset (IPv6 host addresses)
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N banned_clients hash:ip family inet6 hashsize 4096 maxelem 3072 timeout 3600
-
-# Snooped Ports Bitmap
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N snooped_ports bitmap:port range 1-10240
-$IPSET -t raw -A snooped_ports 20           # Passive FTP
-$IPSET -t raw -A snooped_ports 21           # FTP
-$IPSET -t raw -A snooped_ports 23           # Telnet
-$IPSET -t raw -A snooped_ports 25           # SMTP
-$IPSET -t raw -A snooped_ports 53           # DNS
-$IPSET -t raw -A snooped_ports 67           # DHCP Server
-$IPSET -t raw -A snooped_ports 68           # DHCP Client
-$IPSET -t raw -A snooped_ports 69           # TFTP
-$IPSET -t raw -A snooped_ports 80           # HTTP
-$IPSET -t raw -A snooped_ports 107          # Remote Telnet
-$IPSET -t raw -A snooped_ports 109          # POP2
-$IPSET -t raw -A snooped_ports 110          # POP3
-$IPSET -t raw -A snooped_ports 111          # RPC
-$IPSET -t raw -A snooped_ports 113          # IDENT
-$IPSET -t raw -A snooped_ports 115          # SFTP
-$IPSET -t raw -A snooped_ports 135          # Microsoft RPC
-$IPSET -t raw -A snooped_ports 137          # NetBIOS Name Service
-$IPSET -t raw -A snooped_ports 138          # NetBIOS Datagram Service
-$IPSET -t raw -A snooped_ports 139          # NetBIOS Session Service
-$IPSET -t raw -A snooped_ports 143          # IMAP
-$IPSET -t raw -A snooped_ports 161          # SNMP
-$IPSET -t raw -A snooped_ports 162          # SNMP Traps
-$IPSET -t raw -A snooped_ports 177          # XDMCP
-$IPSET -t raw -A snooped_ports 194          # IRC
-$IPSET -t raw -A snooped_ports 199          # SNMP Multiplexer
-$IPSET -t raw -A snooped_ports 220          # IMAP3
-$IPSET -t raw -A snooped_ports 371          # ClearCase
-$IPSET -t raw -A snooped_ports 389          # LDAP
-$IPSET -t raw -A snooped_ports 443          # HTTPS
-$IPSET -t raw -A snooped_ports 445          # SMB
-$IPSET -t raw -A snooped_ports 465          # SSL/TLS SMTP
-$IPSET -t raw -A snooped_ports 500          # IPsec IKE
-$IPSET -t raw -A snooped_ports 513          # Rlogin
-$IPSET -t raw -A snooped_ports 514          # RSH / RCP
-$IPSET -t raw -A snooped_ports 530          # RPC
-$IPSET -t raw -A snooped_ports 546          # DHCPV6 Client
-$IPSET -t raw -A snooped_ports 547          # DHCPV6 Server
-$IPSET -t raw -A snooped_ports 631          # IPP
-$IPSET -t raw -A snooped_ports 636          # SSL/TLS LDAP
-$IPSET -t raw -A snooped_ports 873          # rsync
-$IPSET -t raw -A snooped_ports 989          # SSL/TLS FTP (Data)
-$IPSET -t raw -A snooped_ports 990          # SSL/TLS FTP
-$IPSET -t raw -A snooped_ports 992          # SSL/TLS Telnet
-$IPSET -t raw -A snooped_ports 993          # SSL/TLS IMAP
-$IPSET -t raw -A snooped_ports 994          # SSL/TLS IRC
-$IPSET -t raw -A snooped_ports 995          # SSL/TLS POP3
-$IPSET -t raw -A snooped_ports 1024-1030    # Microsoft Windows Crap
-$IPSET -t raw -A snooped_ports 1099         # Java RMI Registry
-$IPSET -t raw -A snooped_ports 1194         # OpenVPN
-$IPSET -t raw -A snooped_ports 1352         # Lotus Note
-$IPSET -t raw -A snooped_ports 1433         # Microsoft SQL Server
-$IPSET -t raw -A snooped_ports 1434         # Microsoft SQL Monitor
-$IPSET -t raw -A snooped_ports 1863         # MSN Messenger
-$IPSET -t raw -A snooped_ports 2000         # Cisco SCCP
-$IPSET -t raw -A snooped_ports 2049         # NFS
-$IPSET -t raw -A snooped_ports 2401         # CVS
-$IPSET -t raw -A snooped_ports 3130         # ICP
-$IPSET -t raw -A snooped_ports 3289         # ENPC
-$IPSET -t raw -A snooped_ports 3306         # MySQL
-$IPSET -t raw -A snooped_ports 3690         # SVN
-$IPSET -t raw -A snooped_ports 4500         # IPsec NAT Traversal
-$IPSET -t raw -A snooped_ports 4827         # HTCP
-$IPSET -t raw -A snooped_ports 5050         # Yahoo! Messenger
-$IPSET -t raw -A snooped_ports 5190         # AIM
-$IPSET -t raw -A snooped_ports 5222         # Jabber Client
-$IPSET -t raw -A snooped_ports 5269         # Jabber Server
-$IPSET -t raw -A snooped_ports 5353         # mDNS
-$IPSET -t raw -A snooped_ports 5432         # PostgreSQL
-$IPSET -t raw -A snooped_ports 6000-6007    # X11
-$IPSET -t raw -A snooped_ports 6446         # MySQL Proxy
-$IPSET -t raw -A snooped_ports 8080         # Tomcat
-$IPSET -t raw -A snooped_ports 8610         # Canon MFNP
-$IPSET -t raw -A snooped_ports 8612         # Canon MFNP
-$IPSET -t raw -A snooped_ports 9418         # Git
-
-# Service Ports Bitmap
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N tcp_service_ports bitmap:port range 1-10240
-$IPSET -t raw -A tcp_service_ports 22       # SSH
 
 #
 # ══════════════════════ Configure RAW PREROUTING Chain ═══════════════════════
@@ -370,10 +290,10 @@ echo
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
 printInfo 'DROP incoming packets from banned clients'
-$IP6TABLES -t raw -A raw-${NIC}-pre -m set --set banned_clients src -j ban_client_drop
+$IP6TABLES -t raw -A raw-${NIC}-pre -m set --match-set banned_clients_ipv6 src -j ban_client_drop
 
 printInfo 'Ban clients snooping for open ports'
-$IP6TABLES -t raw -A raw-${NIC}-pre -m set --set snooped_ports dst -j ban_client
+$IP6TABLES -t raw -A raw-${NIC}-pre -m set --match-set snooped_ports dst -j ban_client
 
 # TODO: Block the External IP as a source if you have a static IP from your ISP
 
@@ -501,7 +421,7 @@ echo
 #
 
 printInfo 'Allow incoming ACK response packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-ack -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-ack -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending TCP packets from/to invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-ack -j ban_client
@@ -524,7 +444,7 @@ $IP6TABLES -t raw -A raw-${NIC}-syn -p tcp -m tcp --dport 22 -m hashlimit --hash
  	--hashlimit-above 27/hour --hashlimit-burst 9 -j ban_client
 
 printInfo 'Allow incoming SYN request packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-syn -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-syn -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending SYN packets from/to invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-syn -j ban_client
@@ -538,7 +458,7 @@ echo
 #
 
 printInfo 'Allow incoming TCP FIN packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-fin -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending TCP FIN packets for invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-fin -j ban_client
@@ -550,7 +470,7 @@ $IP6TABLES -t raw -A raw-${NIC}-fin -j ban_client
 #
 
 printInfo 'Allow incoming TCP FIN-ACK packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin-ack -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-fin-ack -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending TCP FIN-ACK packets for invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-fin-ack -j ban_client
@@ -564,7 +484,7 @@ echo
 #
 
 printInfo 'Allow incoming TCP RST packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-rst -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending TCP RST packets for invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-rst -j ban_client
@@ -576,7 +496,7 @@ $IP6TABLES -t raw -A raw-${NIC}-rst -j ban_client
 #
 
 printInfo 'Allow incoming TCP RST-ACK packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst-ack -m set --set tcp_service_ports dst -j ACCEPT
+$IP6TABLES -t raw -A raw-${NIC}-rst-ack -m set --match-set tcp_service_ports dst -j ACCEPT
 
 printInfo 'Ban clients sending TCP RST-ACK packets for invalid services'
 $IP6TABLES -t raw -A raw-${NIC}-rst-ack -j ban_client
@@ -745,13 +665,13 @@ printBanner 'Configuring FILTER Table'
 #
 
 printInfo 'Perform TCP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p tcp ACCEPT
+$IP6TABLES -A INPUT -i $NIC -p tcp -j ACCEPT
 
 printInfo 'Perform UDP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p udp ACCEPT
+$IP6TABLES -A INPUT -i $NIC -p udp -j ACCEPT
 
 printInfo 'Perform ICMP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p icmpv6 ACCEPT
+$IP6TABLES -A INPUT -i $NIC -p icmpv6 -j ACCEPT
 
 echo
 
@@ -769,13 +689,13 @@ echo
 #
 
 printInfo 'Perform TCP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p tcp ACCEPT
+$IP6TABLES -A OUTPUT -o $NIC -p tcp -j ACCEPT
 
 printInfo 'Perform UDP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p udp ACCEPT
+$IP6TABLES -A OUTPUT -o $NIC -p udp -j ACCEPT
 
 printInfo 'Perform ICMP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p icmpv6 ACCEPT
+$IP6TABLES -A OUTPUT -o $NIC -p icmpv6 -j ACCEPT
 
 echo
 

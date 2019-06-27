@@ -241,7 +241,7 @@ echo
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Firewall ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set +o errexit
-mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^(enp|ens)[a-z0-9]+')
+mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^e[a-z0-9]+')
 set -o errexit
 
 if [ ${#ethList[@]} -eq 1 ]; then
@@ -257,24 +257,31 @@ fi
 echo "${bold}${yellow}Where is this Ubuntu Server deployed?${white}"
 select DEPLOY_ENV in 'Public Internet' 'Private Intranet'; do
 	if [[ "$DEPLOY_ENV" =~ ^Public ]]; then
+		# Install ipset
+		installPackage '/sbin/ipset' 'ipset'
+
+		# Call ipset-public.sh
+		"$SCRIPT_DIR/etc/network/ipset-public.sh"
+
 		IPTABLES_SCRIPT="$SCRIPT_DIR/etc/network/iptables-public.sh"
 		IP6TABLES_SCRIPT="$SCRIPT_DIR/etc/network/ip6tables-public.sh"
-	else
+
+		break;
+	elif [[ "$DEPLOY_ENV" =~ ^Private ]]; then
 		IPTABLES_SCRIPT="$SCRIPT_DIR/etc/network/iptables-private.sh"
 		IP6TABLES_SCRIPT="$SCRIPT_DIR/etc/network/ip6tables-private.sh"
+
+		break;
 	fi
-	break;
 done
 
 # Install iptables
 installPackage '/sbin/iptables' 'iptables'
 
-# Install ipset
-installPackage '/sbin/ipset' 'ipset'
-
 # Configure IPv4 firewall
 if [ ! -f /etc/network/iptables.rules ] || \
-	[ "$IPTABLES_SCRIPT" -nt /etc/network/iptables.rules ]; then
+	[ "$IPTABLES_SCRIPT" -nt /etc/network/iptables.rules ] || \
+	[[ "$DEPLOY_ENV" =~ ^Public ]]; then
 
 		"$IPTABLES_SCRIPT" $DEFAULT_NIC
 		echo
@@ -282,7 +289,8 @@ fi
 
 # Configure IPv6 firewall
 if [ ! -f /etc/network/ip6tables.rules ] || \
-	[ "$IP6TABLES_SCRIPT" -nt /etc/network/ip6tables.rules ]; then
+	[ "$IP6TABLES_SCRIPT" -nt /etc/network/ip6tables.rules ] || \
+	[[ "$DEPLOY_ENV" =~ ^Public ]]; then
 
 		"$IP6TABLES_SCRIPT" $DEFAULT_NIC
 		echo
@@ -531,15 +539,17 @@ fi
 # User Configuration
 #
 
-# Configure the user with configure-user.sh script
-"$SCRIPT_DIR"/home/configure-user.sh $SUDO_USER
+if [ "${SUDO_USER-}" ] && [ "$SUDO_USER" != 'root' ]; then
+	# Configure the user with configure-user.sh script
+	"$SCRIPT_DIR"/home/configure-user.sh $SUDO_USER
+fi
 
 #
 # LogWatch Configuration
 #
 
 # Configure LogWatch with configure-logwatch.sh script
-"$SCRIPT_DIR"/usr/share/logwatch/default.conf/configure-logwatch.sh
+"$SCRIPT_DIR"/etc/logwatch/configure-logwatch.sh
 
 # Uninstall dnsmasq
 uninstallPackage '/etc/dnsmasq.conf' 'dnsmasq'

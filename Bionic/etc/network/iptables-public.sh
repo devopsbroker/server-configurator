@@ -104,10 +104,10 @@ fi
 ## Bash exec variables
 IPTABLES=/sbin/iptables
 IPTABLES_SAVE=/sbin/iptables-save
-IPSET=/sbin/ipset
+EXEC_DERIVESUBNET=/usr/local/bin/derivesubnet
 
 ## Options
-NIC="$1"
+NIC="${1:-}"
 
 ## Variables
 IPv4_ADDRESS=''
@@ -116,7 +116,7 @@ IPv4_GATEWAY=''
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if [ -z "$NIC" ]; then
-	mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^enp[a-z0-9]+')
+	mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^e[a-z0-9]+')
 
 	if [ ${#ethList[@]} -eq 1 ]; then
 		ethInterface=(${ethList[0]})
@@ -168,8 +168,6 @@ printInfo 'Initializing RAW Table'
 $IPTABLES -t raw -P OUTPUT ACCEPT
 $IPTABLES -t raw -F
 $IPTABLES -t raw -X
-$IPSET -t raw -F
-$IPSET -t raw -X
 
 printInfo 'Initializing MANGLE Table'
 $IPTABLES -t mangle -P INPUT ACCEPT
@@ -242,106 +240,8 @@ $IPTABLES -t raw -A do_not_track -j ACCEPT
 # Ban Client / Rate limit logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 $IPTABLES -t raw -N ban_client
-$IPTABLES -t raw -A ban_client -j SET --add-set banned_clients src
+$IPTABLES -t raw -A ban_client -j SET --add-set banned_clients_ipv4 src
 $IPTABLES -t raw -A ban_client -j ban_client_drop
-
-# Banned Clients IP Hashset (IPv4 host addresses)
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N banned_clients hash:ip family inet hashsize 4096 maxelem 3072 timeout 3600
-
-# Spoofed IP Hashset (IPv4 network addresses)
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET -t raw -N spoofed_ips hash:net family inet hashsize 16 maxelem 12
-$IPSET -t raw -A spoofed_ips 10.0.0.0/8        # Class A Network
-$IPSET -t raw -A spoofed_ips 172.16.0.0/12     # Class B Network
-$IPSET -t raw -A spoofed_ips 192.168.0.0/16    # Class C Network
-$IPSET -t raw -A spoofed_ips 240.0.0.0/4       # Class E Network
-$IPSET -t raw -A spoofed_ips 0.0.0.0/8         # Source hosts
-$IPSET -t raw -A spoofed_ips 127.0.0.0/8       # Loopback
-$IPSET -t raw -A spoofed_ips 169.254.0.0/16    # Link-local
-
-# Snooped Ports Bitmap
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET create snooped_ports bitmap:port range 1-10240
-$IPSET add snooped_ports 20           # Passive FTP
-$IPSET add snooped_ports 21           # FTP
-$IPSET add snooped_ports 23           # Telnet
-$IPSET add snooped_ports 25           # SMTP
-$IPSET add snooped_ports 53           # DNS
-$IPSET add snooped_ports 67           # DHCP Server
-$IPSET add snooped_ports 68           # DHCP Client
-$IPSET add snooped_ports 69           # TFTP
-$IPSET add snooped_ports 80           # HTTP
-$IPSET add snooped_ports 107          # Remote Telnet
-$IPSET add snooped_ports 109          # POP2
-$IPSET add snooped_ports 110          # POP3
-$IPSET add snooped_ports 111          # RPC
-$IPSET add snooped_ports 113          # IDENT
-$IPSET add snooped_ports 115          # SFTP
-$IPSET add snooped_ports 135          # Microsoft RPC
-$IPSET add snooped_ports 137          # NetBIOS Name Service
-$IPSET add snooped_ports 138          # NetBIOS Datagram Service
-$IPSET add snooped_ports 139          # NetBIOS Session Service
-$IPSET add snooped_ports 143          # IMAP
-$IPSET add snooped_ports 161          # SNMP
-$IPSET add snooped_ports 162          # SNMP Traps
-$IPSET add snooped_ports 177          # XDMCP
-$IPSET add snooped_ports 194          # IRC
-$IPSET add snooped_ports 199          # SNMP Multiplexer
-$IPSET add snooped_ports 220          # IMAP3
-$IPSET add snooped_ports 371          # ClearCase
-$IPSET add snooped_ports 389          # LDAP
-$IPSET add snooped_ports 443          # HTTPS
-$IPSET add snooped_ports 445          # SMB
-$IPSET add snooped_ports 465          # SSL/TLS SMTP
-$IPSET add snooped_ports 500          # IPsec IKE
-$IPSET add snooped_ports 513          # Rlogin
-$IPSET add snooped_ports 514          # RSH / RCP
-$IPSET add snooped_ports 530          # RPC
-$IPSET add snooped_ports 546          # DHCPV6 Client
-$IPSET add snooped_ports 547          # DHCPV6 Server
-$IPSET add snooped_ports 631          # IPP
-$IPSET add snooped_ports 636          # SSL/TLS LDAP
-$IPSET add snooped_ports 873          # rsync
-$IPSET add snooped_ports 989          # SSL/TLS FTP (Data)
-$IPSET add snooped_ports 990          # SSL/TLS FTP
-$IPSET add snooped_ports 992          # SSL/TLS Telnet
-$IPSET add snooped_ports 993          # SSL/TLS IMAP
-$IPSET add snooped_ports 994          # SSL/TLS IRC
-$IPSET add snooped_ports 995          # SSL/TLS POP3
-$IPSET add snooped_ports 1024-1030    # Microsoft Windows Crap
-$IPSET add snooped_ports 1099         # Java RMI Registry
-$IPSET add snooped_ports 1194         # OpenVPN
-$IPSET add snooped_ports 1352         # Lotus Note
-$IPSET add snooped_ports 1433         # Microsoft SQL Server
-$IPSET add snooped_ports 1434         # Microsoft SQL Monitor
-$IPSET add snooped_ports 1863         # MSN Messenger
-$IPSET add snooped_ports 2000         # Cisco SCCP
-$IPSET add snooped_ports 2049         # NFS
-$IPSET add snooped_ports 2401         # CVS
-$IPSET add snooped_ports 3130         # ICP
-$IPSET add snooped_ports 3289         # ENPC
-$IPSET add snooped_ports 3306         # MySQL
-$IPSET add snooped_ports 3690         # SVN
-$IPSET add snooped_ports 4500         # IPsec NAT Traversal
-$IPSET add snooped_ports 4827         # HTCP
-$IPSET add snooped_ports 5050         # Yahoo! Messenger
-$IPSET add snooped_ports 5190         # AIM
-$IPSET add snooped_ports 5222         # Jabber Client
-$IPSET add snooped_ports 5269         # Jabber Server
-$IPSET add snooped_ports 5353         # mDNS
-$IPSET add snooped_ports 5432         # PostgreSQL
-$IPSET add snooped_ports 6000-6007    # X11
-$IPSET add snooped_ports 6446         # MySQL Proxy
-$IPSET add snooped_ports 8080         # Tomcat
-$IPSET add snooped_ports 8610         # Canon MFNP
-$IPSET add snooped_ports 8612         # Canon MFNP
-$IPSET add snooped_ports 9418         # Git
-
-# Service Ports Bitmap
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPSET create tcp_service_ports bitmap:port range 1-10240
-$IPSET add tcp_service_ports 22       # SSH
 
 #
 # ══════════════════════ Configure RAW PREROUTING Chain ═══════════════════════
@@ -371,13 +271,13 @@ echo
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
 printInfo 'DROP incoming packets from banned clients'
-$IPTABLES -t raw -A raw-${NIC}-pre -m set --set banned_clients src -j ban_client_drop
+$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set banned_clients_ipv4 src -j ban_client_drop
 
 printInfo 'DROP incoming packets from spoofed IP addresses'
-$IPTABLES -t raw -A raw-${NIC}-pre -m set --set spoofed_ips src -j DROP
+$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set spoofed_ips src -j DROP
 
 printInfo 'Ban clients snooping for open ports'
-$IPTABLES -t raw -A raw-${NIC}-pre -m set --set snooped_ports dst -j ban_client
+$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set snooped_ports dst -j ban_client
 
 # TODO: Block the External IP as a source if you have a static IP from your ISP
 
@@ -461,126 +361,62 @@ printInfo 'Allow incoming HTTP/HTTPS TCP response packets'
 $IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 443 -j ACCEPT
 $IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 80 -j ACCEPT
 
-# Create filter chains for each TCP flag
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+## TCP Ports
+printInfo 'Allow incoming TCP traffic on allowed ports'
+$IPTABLES -t raw -N raw-${NIC}-tcp-port
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-port
+
+## TCP Flags
+printInfo 'Allow incoming TCP traffic with valid TCP flags'
+$IPTABLES -t raw -N raw-${NIC}-tcp-flag
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-flag
+
+## ACCEPT incoming TCP traffic
+printInfo 'ACCEPT incoming TCP traffic'
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j ACCEPT
+
+echo
+
+#
+# *****************************
+# * raw-${NIC}-tcp-port Rules *
+# *****************************
+#
+
+printInfo 'Check for valid incoming TCP traffic based on allowed ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-port -m set --match-set tcp_service_ports dst -j RETURN
+
+printInfo 'Ban clients sending TCP packets to invalid services'
+$IPTABLES -t raw -A raw-${NIC}-tcp-port -j ban_client
+
+echo
+
+#
+# *****************************
+# * raw-${NIC}-tcp-flag Rules *
+# *****************************
+#
 
 ## Established Connections
-printInfo 'Process incoming TCP ACK packets'
-$IPTABLES -t raw -N raw-${NIC}-ack
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST ACK -j raw-${NIC}-ack
+printInfo 'Accept incoming TCP ACK packets'
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST ACK -j RETURN
 
 ## SYN
-printInfo 'Process incoming TCP SYN packets'
-$IPTABLES -t raw -N raw-${NIC}-syn
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN -j raw-${NIC}-syn
+printInfo 'Accept incoming TCP SYN packets'
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN -j RETURN
 
 ## FIN
-printInfo 'Process incoming TCP FIN packets'
-$IPTABLES -t raw -N raw-${NIC}-fin
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN -j raw-${NIC}-fin
-
-$IPTABLES -t raw -N raw-${NIC}-fin-ack
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN,ACK -j raw-${NIC}-fin-ack
+printInfo 'Accept incoming TCP FIN packets'
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN -j RETURN
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN,ACK -j RETURN
 
 ## RST
-printInfo 'Process incoming TCP RST packets'
-$IPTABLES -t raw -N raw-${NIC}-rst
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST -j raw-${NIC}-rst
-
-$IPTABLES -t raw -N raw-${NIC}-rst-ack
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST,ACK -j raw-${NIC}-rst-ack
+printInfo 'Accept incoming TCP RST packets'
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST -j RETURN
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST,ACK -j RETURN
 
 printInfo 'Ban clients sending TCP packets with invalid flags'
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-ack Rules *
-# ************************
-#
-
-printInfo 'Allow incoming ACK response packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-ack -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP packets from/to invalid services'
-$IPTABLES -t raw -A raw-${NIC}-ack -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-syn Rules *
-# ************************
-#
-
-printInfo 'Ban clients sending TCP SYN packets with invalid MSS values'
-$IPTABLES -t raw -A raw-${NIC}-syn -p tcp -m tcpmss ! --mss 536:65496 -j ban_client
-
-printInfo 'Ban clients violating TCP SYN packet SSH rate limiting'
-$IPTABLES -t raw -A raw-${NIC}-syn -p tcp -m tcp --dport 22 -m hashlimit --hashlimit-mode srcip --hashlimit-srcmask 32 \
-	--hashlimit-name ipv4_ssh_rate_limit --hashlimit-htable-size 1024 --hashlimit-htable-max 768 \
-	--hashlimit-htable-expire 7200000 --hashlimit-htable-gcinterval 60000 \
- 	--hashlimit-above 27/hour --hashlimit-burst 9 -j ban_client
-
-printInfo 'Allow incoming SYN request packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-syn -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending SYN packets from/to invalid services'
-$IPTABLES -t raw -A raw-${NIC}-syn -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-fin Rules *
-# ************************
-#
-
-printInfo 'Allow incoming TCP FIN packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-fin -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP FIN packets for invalid services'
-$IPTABLES -t raw -A raw-${NIC}-fin -j ban_client
-
-#
-# ****************************
-# * raw-${NIC}-fin-ack Rules *
-# ****************************
-#
-
-printInfo 'Allow incoming TCP FIN-ACK packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-fin-ack -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP FIN-ACK packets for invalid services'
-$IPTABLES -t raw -A raw-${NIC}-fin-ack -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-rst Rules *
-# ************************
-#
-
-printInfo 'Allow incoming TCP RST packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-rst -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP RST packets for invalid services'
-$IPTABLES -t raw -A raw-${NIC}-rst -j ban_client
-
-#
-# ****************************
-# * raw-${NIC}-rst-ack Rules *
-# ****************************
-#
-
-printInfo 'Allow incoming TCP RST-ACK packets for valid services'
-$IPTABLES -t raw -A raw-${NIC}-rst-ack -m set --set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP RST-ACK packets for invalid services'
-$IPTABLES -t raw -A raw-${NIC}-rst-ack -j ban_client
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -j ban_client
 
 echo
 
@@ -746,13 +582,13 @@ printBanner 'Configuring FILTER Table'
 #
 
 printInfo 'Perform TCP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p tcp ACCEPT
+$IPTABLES -A INPUT -i $NIC -p tcp -j ACCEPT
 
 printInfo 'Perform UDP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p udp ACCEPT
+$IPTABLES -A INPUT -i $NIC -p udp -j ACCEPT
 
 printInfo 'Perform ICMP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p icmp ACCEPT
+$IPTABLES -A INPUT -i $NIC -p icmp -j ACCEPT
 
 echo
 
@@ -770,13 +606,13 @@ echo
 #
 
 printInfo 'Perform TCP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p tcp ACCEPT
+$IPTABLES -A OUTPUT -o $NIC -p tcp -j ACCEPT
 
 printInfo 'Perform UDP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p udp ACCEPT
+$IPTABLES -A OUTPUT -o $NIC -p udp -j ACCEPT
 
 printInfo 'Perform ICMP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p icmp ACCEPT
+$IPTABLES -A OUTPUT -o $NIC -p icmp -j ACCEPT
 
 echo
 

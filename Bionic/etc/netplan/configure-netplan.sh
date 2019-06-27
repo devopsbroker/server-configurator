@@ -84,6 +84,7 @@ EXEC_VERIFYIP=/usr/local/bin/verifyip
 
 ## Variables
 YEAR=$($EXEC_DATE +'%Y')
+hasIPv6=0                          # Assume IPv6 is enabled
 netplanConfig=''
 sysctlConfig=''
 
@@ -96,18 +97,40 @@ fi
 
 printBox "DevOpsBroker $UBUNTU_RELEASE Netplan Configurator" 'true'
 
+# Exit if /etc/fstab already configured
+if [ -f /etc/netplan/50-cloud-init.yaml.orig ] && [ "${1:-}" != '-f' ]; then
+	printNotice $SCRIPT_EXEC '/etc/netplan/50-cloud-init.yaml already configured'
+	echo
+	printUsage "$SCRIPT_EXEC ${gold}[-f]"
+
+	echo ${bold}
+	echo "Valid Options:${romantic}"
+	echo -e ${gold}'  -f\t'  ${romantic}'Force /etc/netplan/50-cloud-init.yaml reconfiguration'
+	echo ${reset}
+
+	exit 0
+fi
+
 #
-# Remove 50-cloud-init.yaml
+# Backup 50-cloud-init.yaml
 #
-if [ -f /etc/netplan/50-cloud-init.yaml ]; then
-	printInfo "Removing /etc/netplan/50-cloud-init.yaml"
-	$EXEC_RM /etc/netplan/50-cloud-init.yaml
+if [ ! -f /etc/netplan/50-cloud-init.yaml.orig ]; then
+	printBanner 'Configure /etc/netplan/50-cloud-init.yaml'
+
+	# Install as root:root with rw-rw-r-- privileges
+	$EXEC_CP --preserve=all /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.orig
+
+else
+	printBanner 'Reconfiguring /etc/netplan/50-cloud-init.yaml'
+
+	# Install as root:root with rw-rw-r-- privileges
+	$EXEC_CP --preserve=all /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.bak
 fi
 
 #
 # Configure network interfaces
 #
-mapfile -t ethInterfaceList < <( $EXEC_IP -br link show | $EXEC_AWK '/^(enp|ens)/{ print $1 }' )
+mapfile -t ethInterfaceList < <( $EXEC_IP -br link show | $EXEC_AWK '/^e/{ print $1 }' )
 
 COLUMNS=1
 for ethInterface in "${ethInterfaceList[@]}"; do
@@ -115,8 +138,10 @@ for ethInterface in "${ethInterfaceList[@]}"; do
 	# Select either Static IP or DHCP
 	echo "${bold}${yellow}What kind of IP configuration do you want to use for '${green}$ethInterface${yellow}'?${white}"
 	select IP_CONFIG in 'Static IP' 'DHCP' 'Skip'; do
-		echo
-		break;
+		if [ "$IP_CONFIG" == 'Static IP' ] || [ "$IP_CONFIG" == 'DHCP' ] || [ "$IP_CONFIG" == 'Skip' ]; then
+			echo
+			break;
+		fi
 	done
 
 	if [ "$IP_CONFIG" != 'Skip' ]; then
@@ -150,6 +175,11 @@ for ethInterface in "${ethInterfaceList[@]}"; do
 				fi
 			done
 
+			# Make sure the IPv4 Address has a CIDR suffix
+			if [[ ! "$IPv4_ADDRESS" =~ /[0-9]+$ ]]; then
+				IPv4_ADDRESS="${IPv4_ADDRESS}/32"
+			fi
+
 			# Procure the IPv4 gateway
 			read -p "${bold}${green}What is the IPv4 gateway?: ${reset}" -i "$IPv4_GATEWAY" -e IPv4_GATEWAY
 
@@ -174,60 +204,60 @@ for ethInterface in "${ethInterfaceList[@]}"; do
 
 			ethInfo=( $($EXEC_DERIVESUBNET -6 $ethInterface) )
 
-			if [ $? -ne 0 ]; then
-				exit 0
-			fi
+			hasIPv6=$?
 
 			set -o errexit
 
-			IPv6_ADDRESS_GLOBAL=${ethInfo[0]}
-			IPv6_ADDRESS_LOCAL=${ethInfo[1]}
-			IPv6_GATEWAY=${ethInfo[2]}
+			if [ $hasIPv6 -eq 0 ]; then
+				IPv6_ADDRESS_GLOBAL=${ethInfo[0]}
+				IPv6_ADDRESS_LOCAL=${ethInfo[1]}
+				IPv6_GATEWAY=${ethInfo[2]}
 
-			# Procure the IPv6 global address
-			read -p "${bold}${green}What is the IPv6 global address?: ${reset}" -i "$IPv6_ADDRESS_GLOBAL" -e IPv6_ADDRESS_GLOBAL
-
-			if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_GLOBAL"; then
-				IPv6_ADDRESS_GLOBAL=''
-			fi
-
-			while [ -z "$IPv6_ADDRESS_GLOBAL" ]; do
+				# Procure the IPv6 global address
 				read -p "${bold}${green}What is the IPv6 global address?: ${reset}" -i "$IPv6_ADDRESS_GLOBAL" -e IPv6_ADDRESS_GLOBAL
 
 				if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_GLOBAL"; then
 					IPv6_ADDRESS_GLOBAL=''
 				fi
-			done
 
-			# Procure the IPv6 local address
-			read -p "${bold}${green}What is the IPv6 local address?: ${reset}" -i "$IPv6_ADDRESS_LOCAL" -e IPv6_ADDRESS_LOCAL
+				while [ -z "$IPv6_ADDRESS_GLOBAL" ]; do
+					read -p "${bold}${green}What is the IPv6 global address?: ${reset}" -i "$IPv6_ADDRESS_GLOBAL" -e IPv6_ADDRESS_GLOBAL
 
-			if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_LOCAL"; then
-				IPv6_ADDRESS_LOCAL=''
-			fi
+					if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_GLOBAL"; then
+						IPv6_ADDRESS_GLOBAL=''
+					fi
+				done
 
-			while [ -z "$IPv6_ADDRESS_LOCAL" ]; do
+				# Procure the IPv6 local address
 				read -p "${bold}${green}What is the IPv6 local address?: ${reset}" -i "$IPv6_ADDRESS_LOCAL" -e IPv6_ADDRESS_LOCAL
 
 				if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_LOCAL"; then
 					IPv6_ADDRESS_LOCAL=''
 				fi
-			done
 
-			# Procure the IPv6 gateway
-			read -p "${bold}${green}What is the IPv6 gateway?: ${reset}" -i "$IPv6_GATEWAY" -e IPv6_GATEWAY
+				while [ -z "$IPv6_ADDRESS_LOCAL" ]; do
+					read -p "${bold}${green}What is the IPv6 local address?: ${reset}" -i "$IPv6_ADDRESS_LOCAL" -e IPv6_ADDRESS_LOCAL
 
-			if ! $EXEC_VERIFYIP "$IPv6_GATEWAY"; then
-				IPv6_GATEWAY=''
-			fi
+					if ! $EXEC_VERIFYIP "$IPv6_ADDRESS_LOCAL"; then
+						IPv6_ADDRESS_LOCAL=''
+					fi
+				done
 
-			while [ -z "$IPv6_GATEWAY" ]; do
+				# Procure the IPv6 gateway
 				read -p "${bold}${green}What is the IPv6 gateway?: ${reset}" -i "$IPv6_GATEWAY" -e IPv6_GATEWAY
 
 				if ! $EXEC_VERIFYIP "$IPv6_GATEWAY"; then
 					IPv6_GATEWAY=''
 				fi
-			done
+
+				while [ -z "$IPv6_GATEWAY" ]; do
+					read -p "${bold}${green}What is the IPv6 gateway?: ${reset}" -i "$IPv6_GATEWAY" -e IPv6_GATEWAY
+
+					if ! $EXEC_VERIFYIP "$IPv6_GATEWAY"; then
+						IPv6_GATEWAY=''
+					fi
+				done
+			fi
 
 			# Configure netplan
 			netplanConfig="$netplanConfig        $ethInterface:\n"
@@ -235,17 +265,33 @@ for ethInterface in "${ethInterfaceList[@]}"; do
 			netplanConfig="$netplanConfig            dhcp4: no\n"
 			netplanConfig="$netplanConfig            dhcp6: no\n"
 			netplanConfig="$netplanConfig            accept-ra: no\n"
-			netplanConfig="$netplanConfig            addresses: [$IPv4_ADDRESS, \"$IPv6_ADDRESS_GLOBAL\", \"$IPv6_ADDRESS_LOCAL\"]\n"
-			netplanConfig="$netplanConfig            gateway4: $IPv4_GATEWAY\n"
-			netplanConfig="$netplanConfig            gateway6: $IPv6_GATEWAY\n"
-			netplanConfig="$netplanConfig            nameservers:\n"
-			netplanConfig="$netplanConfig                addresses: [127.0.0.1, \"::1\"]\n"
 
-			# Configure sysctl for static IPv6 address
-			sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.autoconf = 0\n"
-			sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.accept_ra = 0\n"
-			sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.accept_dad = 0\n"
-			sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.dad_transmits = 0\n"
+			if [ $hasIPv6 -eq 0 ]; then
+				netplanConfig="$netplanConfig            addresses: [$IPv4_ADDRESS, \"$IPv6_ADDRESS_GLOBAL\", \"$IPv6_ADDRESS_LOCAL\"]\n"
+			else
+				netplanConfig="$netplanConfig            addresses: [$IPv4_ADDRESS]\n"
+			fi
+
+			netplanConfig="$netplanConfig            gateway4: $IPv4_GATEWAY\n"
+
+			if [ $hasIPv6 -eq 0 ]; then
+				netplanConfig="$netplanConfig            gateway6: $IPv6_GATEWAY\n"
+			fi
+
+			netplanConfig="$netplanConfig            nameservers:\n"
+			if [ $hasIPv6 -eq 0 ]; then
+				netplanConfig="$netplanConfig                addresses: [127.0.0.1, \"::1\"]\n"
+			else
+				netplanConfig="$netplanConfig                addresses: [127.0.0.1]\n"
+			fi
+
+			if [ $hasIPv6 -eq 0 ]; then
+				# Configure sysctl for static IPv6 address
+				sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.autoconf = 0\n"
+				sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.accept_ra = 0\n"
+				sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.accept_dad = 0\n"
+				sysctlConfig="${sysctlConfig}net.ipv6.conf.$ethInterface.dad_transmits = 0\n"
+			fi
 		else
 			MAC_ADDRESS="$($EXEC_IP -br link show $ethInterface | $EXEC_AWK '{ print $3 }')"
 
@@ -264,6 +310,8 @@ if [ -z "$netplanConfig" ]; then
 	exit 0
 fi
 
+if [ $hasIPv6 -eq 0 ]; then
+
 #
 # Backup 41-ipv6-static.conf
 #
@@ -275,7 +323,6 @@ fi
 #
 # Generate 41-ipv6-static.conf
 #
-if [ "$sysctlConfig" ]; then
 
 /bin/cat << EOF > /etc/sysctl.d/41-ipv6-static.conf
 #

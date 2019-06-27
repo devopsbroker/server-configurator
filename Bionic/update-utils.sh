@@ -188,49 +188,21 @@ printBox "DevOpsBroker $UBUNTU_RELEASE Utility Updater" 'true'
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~ System Administration ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Install addUserToGroup system administration utility
 installSystemUtility addUserToGroup
-
-# Install appbroker system administration utility
 installSystemUtility appbroker
-
-# Install bindmount system administration utility
 installSystemUtility bindmount
-
-# Install bridgebroker system administration utility
 installSystemUtility bridgebroker
-
-# Install dirchmod system administration utility
+installSystemUtility createuser
 installSystemUtility dirchmod
-
-# Install disableJournal system administration utility
 installSystemUtility disableJournal
-
-# Install firewall system administration utility
 installSystemUtility firechain
-
-# Install firewall system administration utility
 installSystemUtility firewall
-
-# Install logbroker system administration utility
 installSystemUtility logbroker
-
-# Install movedir system administration utility
 installSystemUtility movedir
-
-# Install pms system administration utility
 installSystemUtility pms
-
-# Install reportcrash system administration utility
 installSystemUtility reportcrash
-
-# Install schedtuner system administration utility
 installSystemUtility schedtuner
-
-# Install smbshare system administration utility
 installSystemUtility smbshare
-
-# Install wipedisk system administration utility
 installSystemUtility wipedisk
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Firewall Services ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -252,13 +224,8 @@ installService 'smtp-client'
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ User Utilities ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Install archive user utility
 installUserUtility archive
-
-# Install between user utility
 installUserUtility between
-
-# Install convert-number user utility
 installUserUtility convert-number
 
 # Create symbolic links to the convert-number user utility
@@ -267,7 +234,6 @@ createSymlink /usr/local/bin/decimal /usr/local/bin/convert-number
 createSymlink /usr/local/bin/hex /usr/local/bin/convert-number
 createSymlink /usr/local/bin/octal /usr/local/bin/convert-number
 
-# Install convert-temp user utility
 installUserUtility convert-temp
 
 # Create symbolic links to the convert-temp user utility
@@ -275,82 +241,31 @@ createSymlink /usr/local/bin/celsius    /usr/local/bin/convert-temp
 createSymlink /usr/local/bin/fahrenheit /usr/local/bin/convert-temp
 createSymlink /usr/local/bin/kelvin     /usr/local/bin/convert-temp
 
-# Install decrypt user utility
 installUserUtility decrypt
-
-# Install derivesubnet user utility
 installUserUtility derivesubnet
-
-# Install encrypt user utility
 installUserUtility encrypt
-
-# Install extract user utility
 installUserUtility extract
-
-# Install firelog user utility
 installUserUtility firelog
-
-# Install geoip user utility
 installUserUtility geoip
-
-# Install git-repo user utility
 installUserUtility git-repo
-
-# Install kernel-config user utility
 installUserUtility kernel-config
-
-# Install lwp user utility
 installUserUtility lwp
-
-# Install macaddr user utility
 installUserUtility macaddr
-
-# Install nettuner user utility
 installUserUtility nettuner
-
-# Install printAnsi16 user utility
 installUserUtility printAnsi16
-
-# Install public-ip user utility
 installUserUtility public-ip
-
-# Install qemu-config user utility
 installUserUtility qemu-config
-
-# Install random-password user utility
 installUserUtility random-password
-
-# Install reverse-dns user utility
 installUserUtility reverse-dns
-
-# Install scriptinfo user utility
 installUserUtility scriptinfo
-
-# Install showFileFormat user utility
 installUserUtility showFileFormat
-
-# Install sshbroker user utility
 installUserUtility sshbroker
-
-# Install symlink user utility
 installUserUtility symlink
-
-# Install trim user utility
 installUserUtility trim
-
-# Install udev user utility
 installUserUtility udev
-
-# Install uuid user utility
 installUserUtility uuid
-
-# Install verify user utility
 installUserUtility verify
-
-# Install verifyclass user utility
 installUserUtility verifyclass
-
-# Install verifyip user utility
 installUserUtility verifyip
 
 if [ $echoOnExit == 'true' ]; then

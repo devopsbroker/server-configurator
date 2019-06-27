@@ -110,6 +110,7 @@ fi
 printBox "DevOpsBroker $UBUNTU_RELEASE Configurator Installer" 'true'
 
 set +o errexit
+
 devopsGroup="$($EXEC_GETENT group devops)"
 
 # Add devops group
@@ -119,21 +120,25 @@ if [ -z "$devopsGroup" ]; then
 	echo
 fi
 
-# Add user to devops group, if necessary
-if [ -z "$devopsGroup" ] || [ $(echo "$devopsGroup" | $EXEC_GREP -Fc $SUDO_USER ) -eq 0 ]; then
-	printInfo "Adding $SUDO_USER to the 'devops' group"
-	$EXEC_ADDUSER $SUDO_USER 'devops'
-	echo
-fi
+# Manage non-root user groups
+if [ "${SUDO_USER-}" ] && [ "$SUDO_USER" != 'root' ]; then
 
-sudoGroup="$($EXEC_GETENT group sudo)"
-googleSudoersGroup="$($EXEC_GETENT group google-sudoers)"
+	# Add user to devops group, if necessary
+	if [ -z "$devopsGroup" ] || [ $(echo "$devopsGroup" | $EXEC_GREP -Fc $SUDO_USER ) -eq 0 ]; then
+		printInfo "Adding $SUDO_USER to the 'devops' group"
+		$EXEC_ADDUSER $SUDO_USER 'devops'
+		echo
+	fi
 
-# Add user to sudo group, if necessary
-if [ -z "$googleSudoersGroup" ] && [ $(echo "$sudoGroup" | $EXEC_GREP -Fc $SUDO_USER ) -eq 0 ]; then
-	printInfo "Adding $SUDO_USER to the 'sudo' group"
-	$EXEC_ADDUSER $SUDO_USER 'sudo'
-	echo
+	sudoGroup="$($EXEC_GETENT group sudo)"
+	googleSudoersGroup="$($EXEC_GETENT group google-sudoers)"
+
+	# Add user to sudo group, if necessary
+	if [ -z "$googleSudoersGroup" ] && [ $(echo "$sudoGroup" | $EXEC_GREP -Fc $SUDO_USER ) -eq 0 ]; then
+		printInfo "Adding $SUDO_USER to the 'sudo' group"
+		$EXEC_ADDUSER $SUDO_USER 'sudo'
+		echo
+	fi
 fi
 
 # Create /opt/devopsbroker/bionic/server/configurator directory
@@ -183,85 +188,44 @@ fi
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Shell Scripts ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Make symlink to configure-server.sh
+#
+# Create symlinks for DevOpsBroker configuration and administration scripts
+#
+
 createSymlink /usr/local/sbin/configure-server "$INSTALL_DIR"/configure-server.sh
-
-# Make symlink to update-utils.sh
 createSymlink /usr/local/sbin/update-utils "$INSTALL_DIR"/update-utils.sh
-
-# Make symlink to etc/configure-fstab.sh
 createSymlink /usr/local/sbin/configure-fstab "$INSTALL_DIR"/etc/configure-fstab.sh
-
-# Make symlink to etc/configure-kernel.sh
 createSymlink /usr/local/sbin/configure-kernel "$INSTALL_DIR"/etc/configure-kernel.sh
-
-# Make symlink to etc/configure-system.sh
 createSymlink /usr/local/sbin/configure-system "$INSTALL_DIR"/etc/configure-system.sh
-
-# Make symlink to etc/apt/configure-apt-mirror.sh
 createSymlink /usr/local/sbin/configure-apt-mirror "$INSTALL_DIR"/etc/apt/configure-apt-mirror.sh
-
-# Make symlink to etc/default/configure-grub.sh
 createSymlink /usr/local/sbin/configure-grub "$INSTALL_DIR"/etc/default/configure-grub.sh
-
-# Make symlink to etc/logwatch/configure-logwatch.sh
 createSymlink /usr/local/sbin/configure-logwatch "$INSTALL_DIR"/etc/logwatch/configure-logwatch.sh
-
-# Make symlink to etc/netplan/configure-netplan.sh
 createSymlink /usr/local/sbin/configure-netplan "$INSTALL_DIR"/etc/netplan/configure-netplan.sh
-
-# Make symlink to etc/network/ip6tables-private.sh
 createSymlink /usr/local/sbin/ip6tables-private "$INSTALL_DIR"/etc/network/ip6tables-private.sh
-
-# Make symlink to etc/network/ip6tables-public.sh
 createSymlink /usr/local/sbin/ip6tables-public "$INSTALL_DIR"/etc/network/ip6tables-public.sh
-
-# Make symlink to etc/network/iptables-private.sh
 createSymlink /usr/local/sbin/iptables-private "$INSTALL_DIR"/etc/network/iptables-private.sh
-
-# Make symlink to etc/network/iptables-public.sh
 createSymlink /usr/local/sbin/iptables-public "$INSTALL_DIR"/etc/network/iptables-public.sh
-
-# Make symlink to etc/networkd-dispatcher/configure-nic.sh
 createSymlink /usr/local/sbin/configure-nic "$INSTALL_DIR"/etc/networkd-dispatcher/configure-nic.sh
-
-# Make symlink to etc/security/configure-security.sh
 createSymlink /usr/local/sbin/configure-security "$INSTALL_DIR"/etc/security/configure-security.sh
-
-# Make symlink to etc/udev/configure-udev.sh
 createSymlink /usr/local/sbin/configure-udev "$INSTALL_DIR"/etc/udev/configure-udev.sh
-
-# Make symlink to etc/udev/rules.d/tune-diskio.tpl
 createSymlink /usr/local/sbin/tune-diskio "$INSTALL_DIR"/etc/udev/rules.d/tune-diskio.tpl
-
-# Make symlink to etc/unbound/configure-unbound.sh
 createSymlink /usr/local/sbin/configure-unbound "$INSTALL_DIR"/etc/unbound/configure-unbound.sh
-
-# Make symlink to home/configure-user.sh
 createSymlink /usr/local/sbin/configure-user "$INSTALL_DIR"/home/configure-user.sh
-
-# Make symlink to services/install-httpd.sh
 createSymlink /usr/local/sbin/install-httpd "$INSTALL_DIR"/services/install-httpd.sh
 
-# Create /etc/devops directory
+#
+# Install DevOpsBroker configuration files
+#
+
 if [ ! -d /etc/devops ]; then
 	printInfo 'Creating /etc/devops directory'
 	$EXEC_MKDIR --parents --mode=0755 /etc/devops
 fi
 
-# Install /etc/devops/ansi.conf
 installConfig 'ansi.conf' "$INSTALL_DIR/etc/devops" /etc/devops
-
-# Install /etc/devops/exec.conf
 installConfig 'exec.conf' "$INSTALL_DIR/etc/devops" /etc/devops
-
-# Install /etc/devops/functions-admin.conf
 installConfig 'functions-admin.conf' "$INSTALL_DIR/etc/devops" /etc/devops
-
-# Install /etc/devops/functions-io.conf
 installConfig 'functions-io.conf' "$INSTALL_DIR/etc/devops" /etc/devops
-
-# Install /etc/devops/functions.conf
 installConfig 'functions.conf' "$INSTALL_DIR/etc/devops" /etc/devops
 
 exit 0

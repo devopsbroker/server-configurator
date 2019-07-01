@@ -107,6 +107,7 @@ tuneDiskIOTpl=$(isExecutable "$SCRIPT_DIR"/rules.d/tune-diskio.tpl)
 EXEC_LSBLK=/bin/lsblk
 
 ## Variables
+IS_VM_GUEST=0
 export TMPDIR=${TMPDIR:-'/tmp'}
 echoOnExit=false
 
@@ -119,12 +120,14 @@ fi
 
 printBox "DevOpsBroker $UBUNTU_RELEASE Udev Configurator" 'true'
 
-#
-# udev Configuration
-#   o /etc/udev/udev.conf
-#
+# Detect whether Ubuntu Server is running as a guest in a virtual machine
+detectVirtualization
 
-installConfig 'udev.conf' "$SCRIPT_DIR" /etc/udev
+if [ $IS_VM_GUEST -ne 0 ]; then
+	printNotice $SCRIPT_EXEC 'Server is running as a virtual machine...exiting'
+	echo
+	exit 0
+fi
 
 #
 # Disk I/O Schedulers Configuration

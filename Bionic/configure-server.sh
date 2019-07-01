@@ -210,10 +210,8 @@ EXEC_LSCPU=/usr/bin/lscpu
 
 ## Variables
 DEFAULT_NIC=''
-DEPLOY_ENV=''
 IS_AMD=0
 IS_KVM=0
-IS_VM_GUEST=0
 IPTABLES_SCRIPT=''
 IP6TABLES_SCRIPT=''
 
@@ -250,51 +248,15 @@ else
 	COLUMNS=1
 	echo "${bold}${yellow}Which Ethernet interface do you want to configure?${white}"
 	select DEFAULT_NIC in ${ethList[@]}; do
-		break;
+		for nic in ${ethList[@]}; do
+			if [ "$nic" == "$DEFAULT_NIC" ]; then
+				break;
+			fi
+		done
 	done
 fi
 
-echo "${bold}${yellow}Where is this Ubuntu Server deployed?${white}"
-select DEPLOY_ENV in 'Public Internet' 'Private Intranet'; do
-	if [[ "$DEPLOY_ENV" =~ ^Public ]]; then
-		# Install ipset
-		installPackage '/sbin/ipset' 'ipset'
-
-		# Call ipset-public.sh
-		"$SCRIPT_DIR/etc/network/ipset-public.sh"
-
-		IPTABLES_SCRIPT="$SCRIPT_DIR/etc/network/iptables-public.sh"
-		IP6TABLES_SCRIPT="$SCRIPT_DIR/etc/network/ip6tables-public.sh"
-
-		break;
-	elif [[ "$DEPLOY_ENV" =~ ^Private ]]; then
-		IPTABLES_SCRIPT="$SCRIPT_DIR/etc/network/iptables-private.sh"
-		IP6TABLES_SCRIPT="$SCRIPT_DIR/etc/network/ip6tables-private.sh"
-
-		break;
-	fi
-done
-
-# Install iptables
-installPackage '/sbin/iptables' 'iptables'
-
-# Configure IPv4 firewall
-if [ ! -f /etc/network/iptables.rules ] || \
-	[ "$IPTABLES_SCRIPT" -nt /etc/network/iptables.rules ] || \
-	[[ "$DEPLOY_ENV" =~ ^Public ]]; then
-
-		"$IPTABLES_SCRIPT" $DEFAULT_NIC
-		echo
-fi
-
-# Configure IPv6 firewall
-if [ ! -f /etc/network/ip6tables.rules ] || \
-	[ "$IP6TABLES_SCRIPT" -nt /etc/network/ip6tables.rules ] || \
-	[[ "$DEPLOY_ENV" =~ ^Public ]]; then
-
-		"$IP6TABLES_SCRIPT" $DEFAULT_NIC
-		echo
-fi
+"$SCRIPT_DIR/etc/network/configure-firewall.sh" $DEFAULT_NIC
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~ DevOpsBroker Utilities ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -366,13 +328,7 @@ installPackage '/usr/bin/ioping' 'ioping'
 uninstallPackage '/usr/sbin/irqbalance' 'irqbalance'
 
 # Install linux-generic-hwe-18.04
-set +o errexit
-isGCPKernel="$( /bin/uname -r | $EXEC_GREP gcp$ )"
-set -o errexit
-
-if [ -z "$isGCPKernel" ]; then
-	installPackage '/usr/share/doc/linux-generic-hwe-18.04/copyright' 'linux-generic-hwe-18.04'
-fi
+installPackage '/usr/share/doc/linux-generic-hwe-18.04/copyright' 'linux-generic-hwe-18.04'
 
 # Install logwatch
 installPackage '/usr/sbin/logwatch' 'logwatch'
@@ -470,85 +426,82 @@ installPackage '/usr/bin/whois' 'whois'
 # ~~~~~~~~~~~~~~~~~~~~~~~~~ System/User Configuration ~~~~~~~~~~~~~~~~~~~~~~~~~
 
 #
+# User Configuration
+#
+
+if [ "${SUDO_USER-}" ] && [ "$SUDO_USER" != 'root' ]; then
+
+	"$SCRIPT_DIR"/home/configure-user.sh $SUDO_USER
+
+else
+	ADMIN_USER=''
+	read -p "${bold}${green}What administrative username do you want to create?: ${reset}" -i "$ADMIN_USER" -e ADMIN_USER
+
+	while [ -z "$ADMIN_USER" ]; do
+		read -p "${bold}${green}What administrative username do you want to create?: ${reset}" -i "$ADMIN_USER" -e ADMIN_USER
+	done
+
+	/usr/local/sbin/createuser $ADMIN_USER
+fi
+
+#
 # Filesystem Configuration
 #
 
-# Configure /etc/fstab with configure-fstab.sh script
 "$SCRIPT_DIR"/etc/configure-fstab.sh
 
 #
 # Linux Kernel Tuning
 #
 
-# Configure /etc/sysctl.conf with configure-kernel.sh script
 "$SCRIPT_DIR"/etc/configure-kernel.sh
 
 #
 # General System Configuration
 #
 
-# Configure system with configure-system.sh script
 "$SCRIPT_DIR"/etc/configure-system.sh
 
 #
 # GRUB Configuration
 #
 
-# Configure /etc/default/grub with configure-grub.sh script
 "$SCRIPT_DIR"/etc/default/configure-grub.sh
 
 #
 # Unbound DNS Cache Server Configuration
 #
 
-# Configure /etc/unbound/unbound.conf.d/ with configure-unbound.sh script
 "$SCRIPT_DIR"/etc/unbound/configure-unbound.sh
 
 #
 # Netplan Configuration
 #
 
-# Configure /etc/netplan/50-network-init.yaml with configure-netplan.sh script
 "$SCRIPT_DIR"/etc/netplan/configure-netplan.sh
 
 #
 # Networkd-Dispatcher Configuration
 #
 
-# Configure /etc/networkd-dispatcher with configure-nic.sh script
 "$SCRIPT_DIR"/etc/networkd-dispatcher/configure-nic.sh $DEFAULT_NIC
 
 #
 # Systemwide Security Configuration
 #
 
-# Configure /etc/security/limits.d/ with configure-security.sh script
 "$SCRIPT_DIR"/etc/security/configure-security.sh
 
 #
 # Udev Configuration
 #
 
-# Only run UDev configuration if running on bare metal
-if [ $IS_VM_GUEST -eq 0 ]; then
-	# Configure /etc/udev/rules.d/ with configure-udev.sh script
-	"$SCRIPT_DIR"/etc/udev/configure-udev.sh
-fi
-
-#
-# User Configuration
-#
-
-if [ "${SUDO_USER-}" ] && [ "$SUDO_USER" != 'root' ]; then
-	# Configure the user with configure-user.sh script
-	"$SCRIPT_DIR"/home/configure-user.sh $SUDO_USER
-fi
+"$SCRIPT_DIR"/etc/udev/configure-udev.sh
 
 #
 # LogWatch Configuration
 #
 
-# Configure LogWatch with configure-logwatch.sh script
 "$SCRIPT_DIR"/etc/logwatch/configure-logwatch.sh
 
 # Uninstall dnsmasq

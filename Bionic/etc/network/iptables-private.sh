@@ -213,21 +213,15 @@ printBanner 'Configuring RAW Table'
 
 # Rate limit Fragment logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPTABLES -t raw -N ipv4_fragment_drop
-$IPTABLES -t raw -A ipv4_fragment_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 FRAG BLOCK] ' --log-level 7
-$IPTABLES -t raw -A ipv4_fragment_drop -j DROP
+$IPTABLES -t raw -N fragment_drop
+$IPTABLES -t raw -A fragment_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 FRAG BLOCK] ' --log-level 7
+$IPTABLES -t raw -A fragment_drop -j DROP
 
 # Rate limit Network Interface logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPTABLES -t raw -N ipv4_nic_drop
-$IPTABLES -t raw -A ipv4_nic_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 NIC BLOCK] ' --log-level 7
-$IPTABLES -t raw -A ipv4_nic_drop -j DROP
-
-# Rate limit Canon/Epson logging
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IPTABLES -t raw -N ipv4_canon_drop
-$IPTABLES -t raw -A ipv4_canon_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 CANON BLOCK] ' --log-level 7
-$IPTABLES -t raw -A ipv4_canon_drop -j DROP
+$IPTABLES -t raw -N nic_drop
+$IPTABLES -t raw -A nic_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 NIC BLOCK] ' --log-level 7
+$IPTABLES -t raw -A nic_drop -j DROP
 
 # Rate limit TCP logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
@@ -252,7 +246,7 @@ $IPTABLES -t raw -A do_not_track -j ACCEPT
 #
 
 printInfo 'DROP incoming fragmented packets'
-$IPTABLES -t raw -A PREROUTING -f -j ipv4_fragment_drop
+$IPTABLES -t raw -A PREROUTING -f -j fragment_drop
 
 # Create PREROUTING filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
@@ -267,7 +261,7 @@ printInfo 'Allow incoming lo interface traffic'
 $IPTABLES -t raw -A PREROUTING -i lo -j do_not_track
 
 printInfo 'DROP all other incoming interface traffic'
-$IPTABLES -t raw -A PREROUTING -j ipv4_nic_drop
+$IPTABLES -t raw -A PREROUTING -j nic_drop
 
 echo
 
@@ -335,12 +329,11 @@ echo
 # ****************************
 #
 
-printInfo 'Do not track incoming HTTP/HTTPS TCP response packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 443 -j do_not_track
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 80 -j do_not_track
+printInfo 'Do not track incoming TCP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -m set --match-set tcp_service_ports dst -j do_not_track
 
-printInfo 'Do not track incoming SSH TCP request packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --dport 22 -j do_not_track
+printInfo 'Do not track incoming TCP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -m set --match-set tcp_client_ports src -j do_not_track
 
 printInfo 'Further process all other incoming TCP traffic'
 $IPTABLES -t raw -A raw-${NIC}-tcp-pre -j ACCEPT
@@ -353,11 +346,11 @@ echo
 # ****************************
 #
 
-printInfo 'DROP all incoming DHCP request packets'
+printInfo 'DROP incoming DHCP request packets'
 $IPTABLES -t raw -A raw-${NIC}-udp-pre -p udp -m udp -s 0.0.0.0 -d 255.255.255.255 --sport 68 --dport 67 -j DROP
 
 printInfo 'DROP incoming Canon/Epson printer discovery packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-pre -p udp -m multiport --sports 8610,8612,3289 -j ipv4_canon_drop
+$IPTABLES -t raw -A raw-${NIC}-udp-pre -p udp -m multiport --sports 8610,8612,3289 -j DROP
 
 printInfo 'Further process all other incoming UDP traffic'
 $IPTABLES -t raw -A raw-${NIC}-udp-pre -j do_not_track
@@ -369,7 +362,7 @@ echo
 #
 
 printInfo 'DROP outgoing fragmented packets'
-$IPTABLES -t raw -A OUTPUT -f -j ipv4_fragment_drop
+$IPTABLES -t raw -A OUTPUT -f -j fragment_drop
 
 # Create OUTPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
@@ -384,7 +377,7 @@ printInfo 'Allow outgoing lo interface traffic'
 $IPTABLES -t raw -A OUTPUT -o lo -j do_not_track
 
 printInfo 'DROP all other outgoing interface traffic'
-$IPTABLES -t raw -A OUTPUT -j ipv4_nic_drop
+$IPTABLES -t raw -A OUTPUT -j nic_drop
 
 echo
 
@@ -425,12 +418,12 @@ echo
 # ****************************
 #
 
-printInfo 'Do not track outgoing HTTP/HTTPS TCP request packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 443 -j do_not_track
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 80 -j do_not_track
+## TCP Ports
+printInfo 'Do not track outgoing TCP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_service_ports src -j do_not_track
 
-printInfo 'Do not track outgoing SSH TCP response packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --sport 22 -j do_not_track
+printInfo 'Do not track outgoing TCP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_client_ports dst -j do_not_track
 
 printInfo 'Further process all other outgoing TCP traffic'
 $IPTABLES -t raw -A raw-${NIC}-tcp-out -j ACCEPT
@@ -444,7 +437,7 @@ echo
 #
 
 printInfo 'DROP outgoing Canon/Epson printer discovery packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-out -p udp -m multiport --dports 8610,8612,3289 -j ipv4_canon_drop
+$IPTABLES -t raw -A raw-${NIC}-udp-out -p udp -m multiport --dports 8610,8612,3289 -j DROP
 
 printInfo 'Further process all other outgoing UDP traffic'
 $IPTABLES -t raw -A raw-${NIC}-udp-out -p udp -j do_not_track
@@ -554,7 +547,7 @@ $IPTABLES -N filter-${NIC}-udp-in
 $IPTABLES -A filter-${NIC}-in -p udp -j filter-${NIC}-udp-in
 
 ## ICMP
-printInfo 'ACCEPT all incoming ICMP traffic not dropped in RAW table'
+printInfo 'Perform ICMP INPUT traffic accounting'
 $IPTABLES -A filter-${NIC}-in -p icmp -j ACCEPT
 
 ## ALL OTHERS
@@ -593,15 +586,14 @@ echo
 # ******************************
 #
 
-printInfo 'ACCEPT incoming HTTP/HTTPS TCP response packets'
-$IPTABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --sport 443 -j ACCEPT
-$IPTABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --sport 80 -j ACCEPT
-
 printInfo 'Refer to sshguard for incoming SSH TCP request packets'
 $IPTABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j sshguard
 
-printInfo 'ACCEPT incoming SSH TCP request packets'
-$IPTABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j ACCEPT
+printInfo 'ACCEPT incoming TCP traffic for permitted service ports'
+$IPTABLES -A filter-${NIC}-tcp-in -m set --match-set tcp_service_ports dst -j ACCEPT
+
+printInfo 'ACCEPT incoming TCP traffic for permitted client ports'
+$IPTABLES -A filter-${NIC}-tcp-in -m set --match-set tcp_client_ports src -j ACCEPT
 
 printInfo 'REJECT all other incoming TCP traffic'
 $IPTABLES -A filter-${NIC}-tcp-in -j tcp_reject
@@ -614,11 +606,11 @@ echo
 # ******************************
 #
 
-printInfo 'ACCEPT incoming DNS UDP response packets'
-$IPTABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 53 -j ACCEPT
+printInfo 'ACCEPT incoming UDP traffic for permitted service ports'
+$IPTABLES -A filter-${NIC}-udp-in -m set --match-set udp_service_ports dst -j ACCEPT
 
-printInfo 'ACCEPT incoming NTP UDP response packets'
-$IPTABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 123 -j ACCEPT
+printInfo 'ACCEPT incoming UDP traffic for permitted client ports'
+$IPTABLES -A filter-${NIC}-udp-in -m set --match-set udp_client_ports src -j ACCEPT
 
 printInfo 'ACCEPT incoming DHCP UDP response packets'
 $IPTABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 67 --dport 68 -j ACCEPT
@@ -712,12 +704,12 @@ echo
 # *******************************
 #
 
-printInfo 'ACCEPT outgoing HTTP/HTTPS TCP request packets'
-$IPTABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --dport 443 -j ACCEPT
-$IPTABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --dport 80 -j ACCEPT
+## TCP Ports
+printInfo 'ACCEPT outgoing TCP traffic for permitted service ports'
+$IPTABLES -A filter-${NIC}-tcp-out -m set --match-set tcp_service_ports src -j ACCEPT
 
-printInfo 'ACCEPT outgoing SSH TCP response packets'
-$IPTABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --sport 22 -j ACCEPT
+printInfo 'ACCEPT outgoing TCP traffic for permitted client ports'
+$IPTABLES -A filter-${NIC}-tcp-out -m set --match-set tcp_client_ports dst -j ACCEPT
 
 printInfo 'REJECT all other outgoing TCP traffic'
 $IPTABLES -A filter-${NIC}-tcp-out -j tcp_reject
@@ -730,11 +722,12 @@ echo
 # *******************************
 #
 
-printInfo 'ACCEPT outoging DNS UDP request packets'
-$IPTABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 53 -j ACCEPT
+## UDP Ports
+printInfo 'ACCEPT outgoing UDP traffic for permitted service ports'
+$IPTABLES -A filter-${NIC}-udp-out -m set --match-set udp_service_ports src -j ACCEPT
 
-printInfo 'ACCEPT outgoing NTP UDP request packets'
-$IPTABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 123 -j ACCEPT
+printInfo 'ACCEPT outgoing UDP traffic for permitted client ports'
+$IPTABLES -A filter-${NIC}-udp-out -m set --match-set udp_client_ports dst -j ACCEPT
 
 printInfo 'ACCEPT outgoing DHCP UDP request packets'
 $IPTABLES -A filter-${NIC}-udp-out -p udp -m udp --sport 68 --dport 67 -j ACCEPT

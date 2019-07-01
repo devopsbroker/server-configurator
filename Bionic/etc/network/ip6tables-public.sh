@@ -272,14 +272,14 @@ $IP6TABLES -t raw -A PREROUTING -m frag --fragmore -j fragment_drop
 # Create PREROUTING filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'Allow incoming lo interface traffic'
-$IP6TABLES -t raw -A PREROUTING -i lo -j do_not_track
-
 ## NIC
 printInfo "Process incoming $NIC interface traffic"
 $IP6TABLES -t raw -N raw-${NIC}-pre
 $IP6TABLES -t raw -A PREROUTING -i ${NIC} -j raw-${NIC}-pre
+
+## lo
+printInfo 'Allow incoming lo interface traffic'
+$IP6TABLES -t raw -A PREROUTING -i lo -j do_not_track
 
 printInfo 'DROP all other incoming interface traffic'
 $IP6TABLES -t raw -A PREROUTING -j nic_drop
@@ -291,11 +291,6 @@ echo
 
 printInfo 'DROP incoming packets from banned clients'
 $IP6TABLES -t raw -A raw-${NIC}-pre -m set --match-set banned_clients_ipv6 src -j ban_client_drop
-
-printInfo 'Ban clients snooping for open ports'
-$IP6TABLES -t raw -A raw-${NIC}-pre -m set --match-set snooped_ports dst -j ban_client
-
-# TODO: Block the External IP as a source if you have a static IP from your ISP
 
 ## TCP
 printInfo 'Process incoming TCP traffic'
@@ -376,130 +371,65 @@ echo
 # ****************************
 #
 
-printInfo 'Allow incoming HTTP/HTTPS TCP response packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 443 -j ACCEPT
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 80 -j ACCEPT
+## TCP Ports
+printInfo 'Process incoming TCP traffic for allowed ports'
+$IP6TABLES -t raw -N raw-${NIC}-tcp-port-in
+$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-port-in
 
-# Create filter chains for each TCP flag
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+## TCP Flags
+printInfo 'Process incoming TCP traffic for valid TCP flags'
+$IP6TABLES -t raw -N raw-${NIC}-tcp-flag
+$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-flag
+
+## ACCEPT incoming TCP traffic
+printInfo 'ACCEPT incoming TCP traffic'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -j ACCEPT
+
+echo
+
+#
+# ********************************
+# * raw-${NIC}-tcp-port-in Rules *
+# ********************************
+#
+
+printInfo 'Allow incoming TCP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-port-in -m set --match-set tcp_service_ports dst -j RETURN
+
+printInfo 'Allow incoming TCP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-port-in -m set --match-set tcp_client_ports src -j RETURN
+
+printInfo 'Ban clients sending TCP packets to invalid ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-port-in -j ban_client
+
+echo
+
+#
+# *****************************
+# * raw-${NIC}-tcp-flag Rules *
+# *****************************
+#
 
 ## Established Connections
-printInfo 'Process incoming TCP ACK packets'
-$IP6TABLES -t raw -N raw-${NIC}-ack
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST ACK -j raw-${NIC}-ack
+printInfo 'Accept incoming TCP ACK packets'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST ACK -j RETURN
 
 ## SYN
-printInfo 'Process incoming TCP SYN packets'
-$IP6TABLES -t raw -N raw-${NIC}-syn
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN -j raw-${NIC}-syn
+printInfo 'Accept incoming TCP SYN packets'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN -j RETURN
 
 ## FIN
-printInfo 'Process incoming TCP FIN packets'
-$IP6TABLES -t raw -N raw-${NIC}-fin
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN -j raw-${NIC}-fin
-
-$IP6TABLES -t raw -N raw-${NIC}-fin-ack
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN,ACK -j raw-${NIC}-fin-ack
+printInfo 'Accept incoming TCP FIN packets'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN -j RETURN
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST FIN,ACK -j RETURN
 
 ## RST
-printInfo 'Process incoming TCP RST packets'
-$IP6TABLES -t raw -N raw-${NIC}-rst
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST -j raw-${NIC}-rst
-
-$IP6TABLES -t raw -N raw-${NIC}-rst-ack
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST,ACK -j raw-${NIC}-rst-ack
+printInfo 'Accept incoming TCP RST packets'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST -j RETURN
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST RST,ACK -j RETURN
 
 printInfo 'Ban clients sending TCP packets with invalid flags'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-ack Rules *
-# ************************
-#
-
-printInfo 'Allow incoming ACK response packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-ack -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP packets from/to invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-ack -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-syn Rules *
-# ************************
-#
-
-printInfo 'Ban clients sending TCP SYN packets with invalid MSS values'
-$IP6TABLES -t raw -A raw-${NIC}-syn -p tcp -m tcpmss ! --mss 536:65496 -j ban_client
-
-printInfo 'Ban clients violating TCP SYN packet SSH rate limiting'
-$IP6TABLES -t raw -A raw-${NIC}-syn -p tcp -m tcp --dport 22 -m hashlimit --hashlimit-mode srcip --hashlimit-srcmask 32 \
-	--hashlimit-name ipv6_ssh_rate_limit --hashlimit-htable-size 1024 --hashlimit-htable-max 768 \
-	--hashlimit-htable-expire 7200000 --hashlimit-htable-gcinterval 60000 \
- 	--hashlimit-above 27/hour --hashlimit-burst 9 -j ban_client
-
-printInfo 'Allow incoming SYN request packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-syn -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending SYN packets from/to invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-syn -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-fin Rules *
-# ************************
-#
-
-printInfo 'Allow incoming TCP FIN packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP FIN packets for invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin -j ban_client
-
-#
-# ****************************
-# * raw-${NIC}-fin-ack Rules *
-# ****************************
-#
-
-printInfo 'Allow incoming TCP FIN-ACK packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin-ack -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP FIN-ACK packets for invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-fin-ack -j ban_client
-
-echo
-
-#
-# ************************
-# * raw-${NIC}-rst Rules *
-# ************************
-#
-
-printInfo 'Allow incoming TCP RST packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP RST packets for invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst -j ban_client
-
-#
-# ****************************
-# * raw-${NIC}-rst-ack Rules *
-# ****************************
-#
-
-printInfo 'Allow incoming TCP RST-ACK packets for valid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst-ack -m set --match-set tcp_service_ports dst -j ACCEPT
-
-printInfo 'Ban clients sending TCP RST-ACK packets for invalid services'
-$IP6TABLES -t raw -A raw-${NIC}-rst-ack -j ban_client
+$IP6TABLES -t raw -A raw-${NIC}-tcp-flag -j ban_client
 
 echo
 
@@ -509,13 +439,14 @@ echo
 # ****************************
 #
 
-printInfo 'Allow incoming DNS UDP response packets'
-$IP6TABLES -t raw -A raw-${NIC}-udp-pre -p udp -m udp --sport 53 -j ACCEPT
+## UDP Ports
+printInfo 'Allow incoming UDP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_service_ports dst -j ACCEPT
 
-printInfo 'Allow incoming NTP UDP response packets'
-$IP6TABLES -t raw -A raw-${NIC}-udp-pre -p udp -m udp --sport 123 -j ACCEPT
+printInfo 'Allow incoming UDP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_client_ports src -j ACCEPT
 
-printInfo 'Ban clients sending UDP packets from/to invalid services'
+printInfo 'Ban clients sending all other incoming UDP traffic'
 $IP6TABLES -t raw -A raw-${NIC}-udp-pre -j ban_client
 
 echo
@@ -530,14 +461,14 @@ $IP6TABLES -t raw -A OUTPUT -m frag --fragmore -j fragment_drop
 # Create OUTPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'Allow outgoing lo interface traffic'
-$IP6TABLES -t raw -A OUTPUT -o lo -j do_not_track
-
 ## NIC
 printInfo "Process outgoing $NIC interface traffic"
 $IP6TABLES -t raw -N raw-${NIC}-out
 $IP6TABLES -t raw -A OUTPUT -o ${NIC} -j raw-${NIC}-out
+
+## lo
+printInfo 'Allow outgoing lo interface traffic'
+$IP6TABLES -t raw -A OUTPUT -o lo -j do_not_track
 
 printInfo 'DROP all other outgoing interface traffic'
 $IP6TABLES -t raw -A OUTPUT -j nic_drop
@@ -574,13 +505,12 @@ echo
 # ****************************
 #
 
-printInfo 'Allow outgoing SSH TCP request/response packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --sport 22 -j ACCEPT
-$IP6TABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 22 -j ACCEPT
+## TCP Ports
+printInfo 'Allow outgoing TCP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_service_ports src -j ACCEPT
 
-printInfo 'Allow outgoing HTTP/HTTPS TCP request packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 443 -j ACCEPT
-$IP6TABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 80 -j ACCEPT
+printInfo 'Allow outgoing TCP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_client_ports dst -j ACCEPT
 
 printInfo 'DROP all other outgoing TCP traffic'
 $IP6TABLES -t raw -A raw-${NIC}-tcp-out -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 TCP BLOCK] ' --log-level 7
@@ -594,11 +524,12 @@ echo
 # ****************************
 #
 
-printInfo 'Allow outgoing DNS UDP request packets'
-$IP6TABLES -t raw -A raw-${NIC}-udp-out -p udp -m udp --dport 53 -j ACCEPT
+## UDP Ports
+printInfo 'Allow outgoing UDP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-out -m set --match-set udp_service_ports src -j ACCEPT
 
-printInfo 'Allow outgoing NTP UDP request packets'
-$IP6TABLES -t raw -A raw-${NIC}-udp-out -p udp -m udp --dport 123 -j ACCEPT
+printInfo 'Allow outgoing UDP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-out -m set --match-set udp_client_ports dst -j ACCEPT
 
 printInfo 'DROP all other outgoing UDP traffic'
 $IP6TABLES -t raw -A raw-${NIC}-udp-out -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 UDP BLOCK] ' --log-level 7
@@ -619,9 +550,6 @@ $IP6TABLES -t mangle -A PREROUTING -i lo -j ACCEPT
 
 printInfo 'DROP all incoming INVALID packets'
 $IP6TABLES -t mangle -A PREROUTING -m conntrack --ctstate INVALID -j DROP
-
-#printInfo 'Allow up to three SSH connections per client'
-#$IP6TABLES -t mangle -A PREROUTING -p tcp --syn --dport 22 -m connlimit --connlimit-upto 3 -j ACCEPT
 
 #
 # ═══════════════════════ Configure MANGLE INPUT Chain ════════════════════════
@@ -664,14 +592,56 @@ printBanner 'Configuring FILTER Table'
 # ═══════════════════════ Configure FILTER INPUT Chain ════════════════════════
 #
 
-printInfo 'Perform TCP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p tcp -j ACCEPT
+# Create INPUT filter chain for sshguard
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+printInfo "Creating incoming filter chain for sshguard"
+$IP6TABLES -N sshguard
 
+echo
+
+# Create INPUT filter chains for each network interface
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+## NIC
+printInfo "Process incoming $NIC interface traffic"
+$IP6TABLES -N filter-${NIC}-in
+$IP6TABLES -A INPUT -i ${NIC} -j filter-${NIC}-in
+
+## lo
+printInfo 'ACCEPT incoming lo interface traffic'
+$IP6TABLES -A INPUT -i lo -j ACCEPT
+
+echo
+
+# Create INPUT filter chains for each protocol
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+## TCP
+printInfo 'Process incoming TCP traffic'
+$IP6TABLES -N filter-${NIC}-tcp-in
+$IP6TABLES -A filter-${NIC}-in -p tcp -j filter-${NIC}-tcp-in
+
+## UDP
 printInfo 'Perform UDP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p udp -j ACCEPT
+$IP6TABLES -A filter-${NIC}-in -p udp -j ACCEPT
 
+## ICMP
 printInfo 'Perform ICMP INPUT traffic accounting'
-$IP6TABLES -A INPUT -i $NIC -p icmpv6 -j ACCEPT
+$IP6TABLES -A filter-${NIC}-in -p icmp -j ACCEPT
+
+echo
+
+#
+# ******************************
+# * filter-${NIC}-tcp-in Rules *
+# ******************************
+#
+
+printInfo 'Refer to sshguard for incoming SSH TCP request packets'
+$IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j sshguard
+
+printInfo 'Perform TCP INPUT traffic accounting'
+$IP6TABLES -A filter-${NIC}-tcp-in -j ACCEPT
 
 echo
 
@@ -688,18 +658,38 @@ echo
 # ═══════════════════════ Configure FILTER OUTPUT Chain ═══════════════════════
 #
 
-printInfo 'Perform TCP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p tcp -j ACCEPT
+# Create OUTPUT filter chains for each network interface
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-printInfo 'Perform UDP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p udp -j ACCEPT
+## NIC
+printInfo "Process outgoing $NIC interface traffic"
+$IP6TABLES -N filter-${NIC}-out
+$IP6TABLES -A OUTPUT -o ${NIC} -j filter-${NIC}-out
 
-printInfo 'Perform ICMP OUTPUT traffic accounting'
-$IP6TABLES -A OUTPUT -o $NIC -p icmpv6 -j ACCEPT
+## lo
+printInfo 'ACCEPT outgoing lo interface traffic'
+$IP6TABLES -A OUTPUT -o lo -j ACCEPT
 
 echo
 
-################################ IPTABLES-SAVE ################################
+#
+# ***************************
+# * filter-${NIC}-out Rules *
+# ***************************
+#
+
+printInfo 'Perform TCP OUTPUT traffic accounting'
+$IP6TABLES -A filter-${NIC}-out -p tcp -j ACCEPT
+
+printInfo 'Perform UDP OUTPUT traffic accounting'
+$IP6TABLES -A filter-${NIC}-out -p udp -j ACCEPT
+
+printInfo 'Perform ICMP OUTPUT traffic accounting'
+$IP6TABLES -A filter-${NIC}-out -p icmp -j ACCEPT
+
+echo
+
+############################### IP6TABLES-SAVE ################################
 
 printInfo 'Persisting ip6tables Rules'
 

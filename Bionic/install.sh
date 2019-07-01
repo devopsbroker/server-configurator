@@ -26,22 +26,16 @@
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Preprocessing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-## Script information
+#
+# Load DevOpsBroker configuration files locally
+#
+
 SCRIPT_DIR=$( /usr/bin/dirname "$BASH_SOURCE" )
 
-# Load $SCRIPT_DIR/etc/devops/ansi.conf
 source "$SCRIPT_DIR/etc/devops/ansi.conf"
-
-# Load $SCRIPT_DIR/etc/devops/exec.conf
 source "$SCRIPT_DIR/etc/devops/exec.conf"
-
-# Load $SCRIPT_DIR/etc/devops/functions.conf
 source "$SCRIPT_DIR/etc/devops/functions.conf"
-
-# Load $SCRIPT_DIR/etc/devops/functions-admin.conf
 source "$SCRIPT_DIR/etc/devops/functions-admin.conf"
-
-# Load $SCRIPT_DIR/etc/devops/functions-io.conf
 source "$SCRIPT_DIR/etc/devops/functions-io.conf"
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -198,11 +192,13 @@ createSymlink /usr/local/sbin/configure-fstab "$INSTALL_DIR"/etc/configure-fstab
 createSymlink /usr/local/sbin/configure-kernel "$INSTALL_DIR"/etc/configure-kernel.sh
 createSymlink /usr/local/sbin/configure-system "$INSTALL_DIR"/etc/configure-system.sh
 createSymlink /usr/local/sbin/configure-apt-mirror "$INSTALL_DIR"/etc/apt/configure-apt-mirror.sh
+createSymlink /usr/local/sbin/configure-firewall "$INSTALL_DIR"/etc/network/configure-firewall.sh
 createSymlink /usr/local/sbin/configure-grub "$INSTALL_DIR"/etc/default/configure-grub.sh
 createSymlink /usr/local/sbin/configure-logwatch "$INSTALL_DIR"/etc/logwatch/configure-logwatch.sh
 createSymlink /usr/local/sbin/configure-netplan "$INSTALL_DIR"/etc/netplan/configure-netplan.sh
 createSymlink /usr/local/sbin/ip6tables-private "$INSTALL_DIR"/etc/network/ip6tables-private.sh
 createSymlink /usr/local/sbin/ip6tables-public "$INSTALL_DIR"/etc/network/ip6tables-public.sh
+createSymlink /usr/local/sbin/ipset-config "$INSTALL_DIR"/etc/network/ipset-config.sh
 createSymlink /usr/local/sbin/iptables-private "$INSTALL_DIR"/etc/network/iptables-private.sh
 createSymlink /usr/local/sbin/iptables-public "$INSTALL_DIR"/etc/network/iptables-public.sh
 createSymlink /usr/local/sbin/configure-nic "$INSTALL_DIR"/etc/networkd-dispatcher/configure-nic.sh
@@ -227,5 +223,7 @@ installConfig 'exec.conf' "$INSTALL_DIR/etc/devops" /etc/devops
 installConfig 'functions-admin.conf' "$INSTALL_DIR/etc/devops" /etc/devops
 installConfig 'functions-io.conf' "$INSTALL_DIR/etc/devops" /etc/devops
 installConfig 'functions.conf' "$INSTALL_DIR/etc/devops" /etc/devops
+
+echo
 
 exit 0

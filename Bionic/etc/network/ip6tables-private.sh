@@ -121,7 +121,7 @@ SOLICITED_NODE_ADDR='ff02::1:ff00:0/104'
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if [ -z "$NIC" ]; then
-	mapfile -t ethList < <($EXEC_IP -br -6 addr show | $EXEC_GREP -Eo '^(enp|ens)[a-z0-9]+')
+	mapfile -t ethList < <($EXEC_IP -br -6 addr show | $EXEC_GREP -Eo '^e[a-z0-9]+')
 
 	if [ ${#ethList[@]} -eq 1 ]; then
 		ethInterface=(${ethList[0]})
@@ -216,21 +216,15 @@ printBanner 'Configuring RAW Table'
 
 # Rate limit Fragment logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IP6TABLES -t raw -N ipv6_fragment_drop
-$IP6TABLES -t raw -A ipv6_fragment_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 FRAG BLOCK] ' --log-level 7
-$IP6TABLES -t raw -A ipv6_fragment_drop -j DROP
+$IP6TABLES -t raw -N fragment_drop
+$IP6TABLES -t raw -A fragment_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 FRAG BLOCK] ' --log-level 7
+$IP6TABLES -t raw -A fragment_drop -j DROP
 
 # Rate limit Network Interface logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IP6TABLES -t raw -N ipv6_nic_drop
-$IP6TABLES -t raw -A ipv6_nic_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 NIC BLOCK] ' --log-level 7
-$IP6TABLES -t raw -A ipv6_nic_drop -j DROP
-
-# Rate limit Canon/Epson logging
-# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-$IP6TABLES -t raw -N ipv6_canon_drop
-$IP6TABLES -t raw -A ipv6_canon_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 CANON BLOCK] ' --log-level 7
-$IP6TABLES -t raw -A ipv6_canon_drop -j DROP
+$IP6TABLES -t raw -N nic_drop
+$IP6TABLES -t raw -A nic_drop -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv6 NIC BLOCK] ' --log-level 7
+$IP6TABLES -t raw -A nic_drop -j DROP
 
 # Rate limit TCP logging
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
@@ -249,27 +243,30 @@ $IP6TABLES -t raw -A do_not_track -j ACCEPT
 #
 
 printInfo 'DROP incoming fragmented packets'
-$IP6TABLES -t raw -A PREROUTING -m frag --fragmore -j ipv6_fragment_drop
+$IP6TABLES -t raw -A PREROUTING -m frag --fragmore -j fragment_drop
 
 # Create PREROUTING filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-
-## lo
-printInfo 'Allow incoming lo interface traffic'
-$IP6TABLES -t raw -A PREROUTING -i lo -j do_not_track
 
 ## NIC
 printInfo "Process incoming $NIC interface traffic"
 $IP6TABLES -t raw -N raw-${NIC}-pre
 $IP6TABLES -t raw -A PREROUTING -i ${NIC} -j raw-${NIC}-pre
 
+## lo
+printInfo 'Allow incoming lo interface traffic'
+$IP6TABLES -t raw -A PREROUTING -i lo -j do_not_track
+
 printInfo 'DROP all other incoming interface traffic'
-$IP6TABLES -t raw -A PREROUTING -j ipv6_nic_drop
+$IP6TABLES -t raw -A PREROUTING -j nic_drop
 
 echo
 
 # Create PREROUTING filter chains for each protocol
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+printInfo 'Allow incoming IPv6 Internal packets'
+$IP6TABLES -t raw -A raw-${NIC}-pre -s $IPv6_SUBNET_LOCAL -j do_not_track
 
 ## TCP
 printInfo 'Process incoming TCP traffic'
@@ -306,12 +303,6 @@ echo
 # 137               redirect
 #
 
-printInfo 'Allow incoming Link-Local ICMPv6 packets'
-$IP6TABLES -t raw -A raw-${NIC}-icmpv6-pre -s $IPv6_SUBNET_LOCAL -j do_not_track
-
-printInfo 'Allow ICMPv6 neighbor-advertisement packets'
-$IP6TABLES -t raw -A raw-${NIC}-icmpv6-pre -p icmpv6 -m icmpv6 -s $IPv6_SUBNET_GLOBAL -d $ALL_NODES_LOCAL --icmpv6-type neighbor-advertisement -j do_not_track
-
 printInfo 'Allow ICMPv6 destination-unreachable packets'
 $IP6TABLES -t raw -A raw-${NIC}-icmpv6-pre -p icmpv6 -m icmpv6 --icmpv6-type destination-unreachable -j do_not_track
 
@@ -342,18 +333,12 @@ echo
 # ****************************
 #
 
-printInfo 'DROP incoming Microsoft Remote Desktop packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --dport 3389 -j tcp_drop
+## TCP Ports
+printInfo 'Do not track incoming TCP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -m set --match-set tcp_service_ports dst -j do_not_track
 
-printInfo 'Allow incoming Link-Local TCP packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -s $IPv6_SUBNET_LOCAL -j do_not_track
-
-printInfo 'Do not track incoming HTTP/HTTPS TCP response packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 443 -j do_not_track
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 80 -j do_not_track
-
-printInfo 'Do not track incoming DNS TCP response packets'
-$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 53 -j do_not_track
+printInfo 'Do not track incoming TCP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-tcp-pre -m set --match-set tcp_client_ports src -j do_not_track
 
 printInfo 'Further process all other incoming TCP traffic'
 $IP6TABLES -t raw -A raw-${NIC}-tcp-pre -j ACCEPT
@@ -366,8 +351,12 @@ echo
 # ****************************
 #
 
-printInfo 'DROP incoming Canon/Epson printer discovery packets'
-$IP6TABLES -t raw -A raw-${NIC}-udp-pre -p udp -m multiport --sports 8610,8612,3289 -j ipv6_canon_drop
+## UDP Ports
+printInfo 'Do not track incoming UDP traffic for permitted service ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_service_ports dst -j ACCEPT
+
+printInfo 'Do not track incoming UDP traffic for permitted client ports'
+$IP6TABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_client_ports src -j ACCEPT
 
 printInfo 'Further process all other incoming UDP traffic'
 $IP6TABLES -t raw -A raw-${NIC}-udp-pre -j do_not_track
@@ -379,27 +368,30 @@ echo
 #
 
 printInfo 'DROP outgoing fragmented packets'
-$IP6TABLES -t raw -A OUTPUT -m frag --fragmore -j ipv6_fragment_drop
+$IP6TABLES -t raw -A OUTPUT -m frag --fragmore -j fragment_drop
 
 # Create OUTPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
-
-## lo
-printInfo 'Allow outgoing lo interface traffic'
-$IP6TABLES -t raw -A OUTPUT -o lo -j do_not_track
 
 ## NIC
 printInfo "Process outgoing $NIC interface traffic"
 $IP6TABLES -t raw -N raw-${NIC}-out
 $IP6TABLES -t raw -A OUTPUT -o ${NIC} -j raw-${NIC}-out
 
+## lo
+printInfo 'Allow outgoing lo interface traffic'
+$IP6TABLES -t raw -A OUTPUT -o lo -j do_not_track
+
 printInfo 'DROP all other outgoing interface traffic'
-$IP6TABLES -t raw -A OUTPUT -j ipv6_nic_drop
+$IP6TABLES -t raw -A OUTPUT -j nic_drop
 
 echo
 
 # Create OUTPUT filter chains for each protocol
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+printInfo 'Allow outgoing IPv6 Internal packets'
+$IP6TABLES -t raw -A raw-${NIC}-out -d $IPv6_SUBNET_LOCAL -j do_not_track
 
 ## TCP
 printInfo 'Process outgoing TCP traffic'
@@ -465,6 +457,9 @@ printBanner 'Configuring MANGLE Table'
 # ═════════════════════ Configure MANGLE PREROUTING Chain ═════════════════════
 #
 
+printInfo 'Allow incoming lo interface traffic'
+$IP6TABLES -t mangle -A PREROUTING -i lo -j ACCEPT
+
 printInfo 'Drop all incoming INVALID packets'
 $IP6TABLES -t mangle -A PREROUTING -m conntrack --ctstate INVALID -j DROP
 
@@ -483,6 +478,9 @@ $IP6TABLES -t mangle -P FORWARD DROP
 #
 # ═══════════════════════ Configure MANGLE OUTPUT Chain ═══════════════════════
 #
+
+printInfo 'Allow outgoing lo interface traffic'
+$IP6TABLES -t mangle -A OUTPUT -o lo -j ACCEPT
 
 printInfo 'DROP all outgoing INVALID packets'
 $IP6TABLES -t mangle -A OUTPUT -m conntrack --ctstate INVALID -j DROP
@@ -525,14 +523,14 @@ $IP6TABLES -N sshguard
 # Create INPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'ACCEPT incoming lo interface traffic'
-$IP6TABLES -A INPUT -i lo -j ACCEPT
-
 ## NIC
 printInfo "Process incoming $NIC interface traffic"
 $IP6TABLES -N filter-${NIC}-in
 $IP6TABLES -A INPUT -i ${NIC} -j filter-${NIC}-in
+
+## lo
+printInfo 'ACCEPT incoming lo interface traffic'
+$IP6TABLES -A INPUT -i lo -j ACCEPT
 
 echo
 
@@ -590,18 +588,14 @@ echo
 # ******************************
 #
 
-printInfo 'ACCEPT incoming HTTP/HTTPS TCP response packets'
-$IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --sport 443 -j ACCEPT
-$IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --sport 80 -j ACCEPT
-
 printInfo 'Refer to sshguard for incoming SSH TCP request packets'
 $IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j sshguard
 
-printInfo 'ACCEPT incoming SSH TCP request packets'
-$IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j ACCEPT
+printInfo 'ACCEPT incoming TCP traffic for permitted service ports'
+$IP6TABLES -A filter-${NIC}-tcp-in -m set --match-set tcp_service_ports dst -j ACCEPT
 
-printInfo 'ACCEPT incoming DNS TCP response packets'
-$IP6TABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --sport 53 -j ACCEPT
+printInfo 'ACCEPT incoming TCP traffic for permitted client ports'
+$IP6TABLES -A filter-${NIC}-tcp-in -m set --match-set tcp_client_ports src -j ACCEPT
 
 printInfo 'REJECT all other incoming TCP traffic'
 $IP6TABLES -A filter-${NIC}-tcp-in -j tcp_reject
@@ -614,19 +608,19 @@ echo
 # ******************************
 #
 
-printInfo 'ACCEPT incoming HTTPS UDP response packets'
-$IP6TABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 443 -j ACCEPT
+printInfo 'ACCEPT incoming UDP traffic for permitted service ports'
+$IP6TABLES -A filter-${NIC}-udp-in -m set --match-set udp_service_ports dst -j ACCEPT
 
-printInfo 'ACCEPT incoming DNS UDP response packets'
-$IP6TABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 53 -j ACCEPT
+printInfo 'ACCEPT incoming UDP traffic for permitted client ports'
+$IP6TABLES -A filter-${NIC}-udp-in -m set --match-set udp_client_ports src -j ACCEPT
 
-printInfo 'ACCEPT incoming NTP UDP response packets'
-$IP6TABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 123 -j ACCEPT
+printInfo 'ACCEPT incoming DHCP UDP response packets'
+$IP6TABLES -A filter-${NIC}-udp-in -p udp -m udp --sport 67 --dport 68 -j ACCEPT
 
 printInfo 'ACCEPT incoming mDNSv6 UDP response packets'
 $IP6TABLES -A filter-${NIC}-udp-in -p udp -m udp -s $IPv6_SUBNET_GLOBAL -d $mDNSv6_ADDR --sport 5353 -j ACCEPT
 
-printInfo 'REJECT all other incoming UDP UNICAST traffic'
+printInfo 'REJECT all other incoming UDP traffic'
 $IP6TABLES -A filter-${NIC}-udp-in -j icmp_reject
 
 echo
@@ -647,14 +641,14 @@ echo
 # Create OUTPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'ACCEPT outgoing lo interface traffic'
-$IP6TABLES -A OUTPUT -o lo -j ACCEPT
-
 ## NIC
 printInfo "Process outgoing $NIC interface traffic"
 $IP6TABLES -N filter-${NIC}-out
 $IP6TABLES -A OUTPUT -o ${NIC} -j filter-${NIC}-out
+
+## lo
+printInfo 'ACCEPT outgoing lo interface traffic'
+$IP6TABLES -A OUTPUT -o lo -j ACCEPT
 
 echo
 
@@ -712,15 +706,12 @@ echo
 # *******************************
 #
 
-printInfo 'ACCEPT outgoing HTTP/HTTPS TCP request packets'
-$IP6TABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --dport 443 -j ACCEPT
-$IP6TABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --dport 80 -j ACCEPT
+## TCP Ports
+printInfo 'ACCEPT outgoing TCP traffic for permitted service ports'
+$IP6TABLES -A filter-${NIC}-tcp-out -m set --match-set tcp_service_ports src -j ACCEPT
 
-printInfo 'ACCEPT outgoing SSH TCP response packets'
-$IP6TABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --sport 22 -j ACCEPT
-
-printInfo 'ACCEPT outgoing DNS TCP request packets'
-$IP6TABLES -A filter-${NIC}-tcp-out -p tcp -m tcp --dport 53 -j ACCEPT
+printInfo 'ACCEPT outgoing TCP traffic for permitted client ports'
+$IP6TABLES -A filter-${NIC}-tcp-out -m set --match-set tcp_client_ports dst -j ACCEPT
 
 printInfo 'REJECT all other outgoing TCP traffic'
 $IP6TABLES -A filter-${NIC}-tcp-out -j tcp_reject
@@ -733,14 +724,15 @@ echo
 # *******************************
 #
 
-printInfo 'ACCEPT outoging HTTPS UDP request packets'
-$IP6TABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 443 -j ACCEPT
+## UDP Ports
+printInfo 'ACCEPT outgoing UDP traffic for permitted service ports'
+$IP6TABLES -A filter-${NIC}-udp-out -m set --match-set udp_service_ports src -j ACCEPT
 
-printInfo 'ACCEPT outoging DNS UDP request packets'
-$IP6TABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 53 -j ACCEPT
+printInfo 'ACCEPT outgoing UDP traffic for permitted client ports'
+$IP6TABLES -A filter-${NIC}-udp-out -m set --match-set udp_client_ports dst -j ACCEPT
 
-printInfo 'ACCEPT outgoing NTP UDP request packets'
-$IP6TABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 123 -j ACCEPT
+printInfo 'ACCEPT outgoing DHCP UDP request packets'
+$IP6TABLES -A filter-${NIC}-udp-out -p udp -m udp --sport 68 --dport 67 -j ACCEPT
 
 printInfo 'ACCEPT outgoing mDNSv6 UDP request packets'
 $IP6TABLES -A filter-${NIC}-udp-out -p udp -m udp --dport 5353 -d $mDNSv6_ADDR -j ACCEPT

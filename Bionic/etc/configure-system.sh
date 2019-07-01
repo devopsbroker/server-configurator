@@ -46,6 +46,7 @@
 # o /etc/sudoers.d/20-env_keep
 # o /etc/sysctl.d/40-ipv6-enable.conf
 # o /etc/systemd/system/iptables.service
+# o /etc/udev/udev.conf
 #
 # Other configuration tasks include:
 # o Disable root login
@@ -200,20 +201,12 @@ set -o errexit
 $EXEC_CP -uv "$SCRIPT_DIR"/bash_completion.d/* /etc/bash_completion.d
 $EXEC_CHMOD --changes 644 /etc/bash_completion.d/*
 
+# Install DevOpsBroker configuration files
 if [ -d "$SCRIPT_DIR"/devops ]; then
-	# Install /etc/devops/ansi.conf
 	installConfig 'ansi.conf' "$SCRIPT_DIR/devops" /etc/devops
-
-	# Install /etc/devops/exec.conf
 	installConfig 'exec.conf' "$SCRIPT_DIR/devops" /etc/devops
-
-	# Install /etc/devops/functions.conf
 	installConfig 'functions.conf' "$SCRIPT_DIR/devops" /etc/devops
-
-	# Install /etc/devops/functions-admin.conf
 	installConfig 'functions-admin.conf' "$SCRIPT_DIR/devops" /etc/devops
-
-	# Install /etc/devops/functions-io.conf
 	installConfig 'functions-io.conf' "$SCRIPT_DIR/devops" /etc/devops
 fi
 
@@ -234,20 +227,15 @@ if [ ! -f /etc/modprobe.d/nf_conntrack.conf ] || \
 	echoOnExit=true
 fi
 
-# Install /etc/network/firewall-restore.sh
 installConfig 'firewall-restore.sh' "$SCRIPT_DIR"/network /etc/network
 
 if [ "$INSTALL_CONFIG" == 'true' ]; then
 	$EXEC_CHMOD 755 /etc/network/firewall-restore.sh
 fi
 
-# Install /etc/pam.d/common-session
 installConfig 'common-session' "$SCRIPT_DIR"/pam.d /etc/pam.d
-
-# Install /etc/ssh/sshd_config
 installConfig 'sshd_config' "$SCRIPT_DIR"/ssh /etc/ssh 'ssh'
 
-# Install /etc/sudoers.d/10-umask
 if [ ! -f /etc/sudoers.d/10-umask ]; then
 	printInfo 'Installing /etc/sudoers.d/10-umask'
 
@@ -257,7 +245,6 @@ if [ ! -f /etc/sudoers.d/10-umask ]; then
 	echoOnExit=true
 fi
 
-# Install /etc/sudoers.d/20-env_keep
 if [ ! -f /etc/sudoers.d/20-env_keep ]; then
 	printInfo 'Installing /etc/sudoers.d/20-env_keep'
 
@@ -266,10 +253,7 @@ if [ ! -f /etc/sudoers.d/20-env_keep ]; then
 	echoOnExit=true
 fi
 
-# Install /etc/sysctl.d/40-ipv6-enable.conf
 installConfig '40-ipv6-enable.conf' "$SCRIPT_DIR"/sysctl.d /etc/sysctl.d
-
-# Install /etc/systemd/system/iptables.service
 installConfig 'iptables.service' "$SCRIPT_DIR"/systemd/system /etc/systemd/system
 
 if [ "$INSTALL_CONFIG" == 'true' ]; then
@@ -281,6 +265,8 @@ if [ "$INSTALL_CONFIG" == 'true' ]; then
 	printInfo 'Starting iptables.service'
 	$EXEC_SYSTEMCTL start iptables.service
 fi
+
+installConfig 'udev.conf' "$SCRIPT_DIR/udev" /etc/udev
 
 #
 # Disable root login

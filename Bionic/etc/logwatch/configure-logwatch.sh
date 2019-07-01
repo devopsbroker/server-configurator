@@ -406,6 +406,9 @@ EOF
 printInfo 'Restarting Postfix service'
 $EXEC_SYSTEMCTL restart postfix.service
 
+# Manage firewall access for SMTP
+/usr/local/sbin/firewall enable smtp-client
+
 echo
 
 exit 0

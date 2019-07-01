@@ -253,14 +253,14 @@ $IPTABLES -t raw -A PREROUTING -f -j fragment_drop
 # Create PREROUTING filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'Allow incoming lo interface traffic'
-$IPTABLES -t raw -A PREROUTING -i lo -j do_not_track
-
 ## NIC
 printInfo "Process incoming $NIC interface traffic"
 $IPTABLES -t raw -N raw-${NIC}-pre
 $IPTABLES -t raw -A PREROUTING -i ${NIC} -j raw-${NIC}-pre
+
+## lo
+printInfo 'Allow incoming lo interface traffic'
+$IPTABLES -t raw -A PREROUTING -i lo -j do_not_track
 
 printInfo 'DROP all other incoming interface traffic'
 $IPTABLES -t raw -A PREROUTING -j nic_drop
@@ -273,11 +273,8 @@ echo
 printInfo 'DROP incoming packets from banned clients'
 $IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set banned_clients_ipv4 src -j ban_client_drop
 
-printInfo 'DROP incoming packets from spoofed IP addresses'
-$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set spoofed_ips src -j DROP
-
-printInfo 'Ban clients snooping for open ports'
-$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set snooped_ports dst -j ban_client
+printInfo 'Ban clients sending incoming packets from spoofed IP addresses'
+$IPTABLES -t raw -A raw-${NIC}-pre -m set --match-set spoofed_ips src -j ban_client
 
 # TODO: Block the External IP as a source if you have a static IP from your ISP
 
@@ -357,17 +354,13 @@ echo
 # ****************************
 #
 
-printInfo 'Allow incoming HTTP/HTTPS TCP response packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 443 -j ACCEPT
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -p tcp -m tcp --sport 80 -j ACCEPT
-
 ## TCP Ports
-printInfo 'Allow incoming TCP traffic on allowed ports'
-$IPTABLES -t raw -N raw-${NIC}-tcp-port
-$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-port
+printInfo 'Process incoming TCP traffic for allowed ports'
+$IPTABLES -t raw -N raw-${NIC}-tcp-port-in
+$IPTABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-port-in
 
 ## TCP Flags
-printInfo 'Allow incoming TCP traffic with valid TCP flags'
+printInfo 'Process incoming TCP traffic for valid TCP flags'
 $IPTABLES -t raw -N raw-${NIC}-tcp-flag
 $IPTABLES -t raw -A raw-${NIC}-tcp-pre -j raw-${NIC}-tcp-flag
 
@@ -378,16 +371,19 @@ $IPTABLES -t raw -A raw-${NIC}-tcp-pre -j ACCEPT
 echo
 
 #
-# *****************************
-# * raw-${NIC}-tcp-port Rules *
-# *****************************
+# ********************************
+# * raw-${NIC}-tcp-port-in Rules *
+# ********************************
 #
 
-printInfo 'Check for valid incoming TCP traffic based on allowed ports'
-$IPTABLES -t raw -A raw-${NIC}-tcp-port -m set --match-set tcp_service_ports dst -j RETURN
+printInfo 'Allow incoming TCP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-port-in -m set --match-set tcp_service_ports dst -j RETURN
 
-printInfo 'Ban clients sending TCP packets to invalid services'
-$IPTABLES -t raw -A raw-${NIC}-tcp-port -j ban_client
+printInfo 'Allow incoming TCP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-port-in -m set --match-set tcp_client_ports src -j RETURN
+
+printInfo 'Ban clients sending TCP packets to invalid ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-port-in -j ban_client
 
 echo
 
@@ -404,6 +400,7 @@ $IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RS
 ## SYN
 printInfo 'Accept incoming TCP SYN packets'
 $IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN -j RETURN
+$IPTABLES -t raw -A raw-${NIC}-tcp-flag -p tcp -m tcp --tcp-flags SYN,ACK,FIN,RST SYN,ACK -j RETURN
 
 ## FIN
 printInfo 'Accept incoming TCP FIN packets'
@@ -426,13 +423,14 @@ echo
 # ****************************
 #
 
-printInfo 'Allow incoming DNS UDP response packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-pre -p udp -m udp --sport 53 -j ACCEPT
+## UDP Ports
+printInfo 'Allow incoming UDP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_service_ports dst -j ACCEPT
 
-printInfo 'Allow incoming NTP UDP response packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-pre -p udp -m udp --sport 123 -j ACCEPT
+printInfo 'Allow incoming UDP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-udp-pre -m set --match-set udp_client_ports src -j ACCEPT
 
-printInfo 'Ban clients sending UDP packets from/to invalid services'
+printInfo 'Ban clients sending all other incoming UDP traffic'
 $IPTABLES -t raw -A raw-${NIC}-udp-pre -j ban_client
 
 echo
@@ -447,14 +445,14 @@ $IPTABLES -t raw -A OUTPUT -f -j fragment_drop
 # Create OUTPUT filter chains for each network interface
 # ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
 
-## lo
-printInfo 'Allow outgoing lo interface traffic'
-$IPTABLES -t raw -A OUTPUT -o lo -j do_not_track
-
 ## NIC
 printInfo "Process outgoing $NIC interface traffic"
 $IPTABLES -t raw -N raw-${NIC}-out
 $IPTABLES -t raw -A OUTPUT -o ${NIC} -j raw-${NIC}-out
+
+## lo
+printInfo 'Allow outgoing lo interface traffic'
+$IPTABLES -t raw -A OUTPUT -o lo -j do_not_track
 
 printInfo 'DROP all other outgoing interface traffic'
 $IPTABLES -t raw -A OUTPUT -j nic_drop
@@ -491,13 +489,12 @@ echo
 # ****************************
 #
 
-printInfo 'Allow outgoing SSH TCP request/response packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --sport 22 -j ACCEPT
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 22 -j ACCEPT
+## TCP Ports
+printInfo 'Allow outgoing TCP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_service_ports src -j ACCEPT
 
-printInfo 'Allow outgoing HTTP/HTTPS TCP request packets'
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 443 -j ACCEPT
-$IPTABLES -t raw -A raw-${NIC}-tcp-out -p tcp -m tcp --dport 80 -j ACCEPT
+printInfo 'Allow outgoing TCP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-tcp-out -m set --match-set tcp_client_ports dst -j ACCEPT
 
 printInfo 'DROP all other outgoing TCP traffic'
 $IPTABLES -t raw -A raw-${NIC}-tcp-out -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 TCP BLOCK] ' --log-level 7
@@ -511,11 +508,12 @@ echo
 # ****************************
 #
 
-printInfo 'Allow outgoing DNS UDP request packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-out -p udp -m udp --dport 53 -j ACCEPT
+## UDP Ports
+printInfo 'Allow outgoing UDP traffic for permitted service ports'
+$IPTABLES -t raw -A raw-${NIC}-udp-out -m set --match-set udp_service_ports src -j ACCEPT
 
-printInfo 'Allow outgoing NTP UDP request packets'
-$IPTABLES -t raw -A raw-${NIC}-udp-out -p udp -m udp --dport 123 -j ACCEPT
+printInfo 'Allow outgoing UDP traffic for permitted client ports'
+$IPTABLES -t raw -A raw-${NIC}-udp-out -m set --match-set udp_client_ports dst -j ACCEPT
 
 printInfo 'DROP all other outgoing UDP traffic'
 $IPTABLES -t raw -A raw-${NIC}-udp-out -m limit --limit 3/min --limit-burst 2 -j LOG --log-prefix '[IPv4 UDP BLOCK] ' --log-level 7
@@ -536,9 +534,6 @@ $IPTABLES -t mangle -A PREROUTING -i lo -j ACCEPT
 
 printInfo 'DROP all incoming INVALID packets'
 $IPTABLES -t mangle -A PREROUTING -m conntrack --ctstate INVALID -j DROP
-
-#printInfo 'Allow up to three SSH connections per client'
-#$IPTABLES -t mangle -A PREROUTING -p tcp --syn --dport 22 -m connlimit --connlimit-upto 3 -j ACCEPT
 
 #
 # ═══════════════════════ Configure MANGLE INPUT Chain ════════════════════════
@@ -581,14 +576,56 @@ printBanner 'Configuring FILTER Table'
 # ═══════════════════════ Configure FILTER INPUT Chain ════════════════════════
 #
 
-printInfo 'Perform TCP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p tcp -j ACCEPT
+# Create INPUT filter chain for sshguard
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+printInfo "Creating incoming filter chain for sshguard"
+$IPTABLES -N sshguard
 
+echo
+
+# Create INPUT filter chains for each network interface
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+## NIC
+printInfo "Process incoming $NIC interface traffic"
+$IPTABLES -N filter-${NIC}-in
+$IPTABLES -A INPUT -i ${NIC} -j filter-${NIC}-in
+
+## lo
+printInfo 'ACCEPT incoming lo interface traffic'
+$IPTABLES -A INPUT -i lo -j ACCEPT
+
+echo
+
+# Create INPUT filter chains for each protocol
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+## TCP
+printInfo 'Process incoming TCP traffic'
+$IPTABLES -N filter-${NIC}-tcp-in
+$IPTABLES -A filter-${NIC}-in -p tcp -j filter-${NIC}-tcp-in
+
+## UDP
 printInfo 'Perform UDP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p udp -j ACCEPT
+$IPTABLES -A filter-${NIC}-in -p udp -j ACCEPT
 
+## ICMP
 printInfo 'Perform ICMP INPUT traffic accounting'
-$IPTABLES -A INPUT -i $NIC -p icmp -j ACCEPT
+$IPTABLES -A filter-${NIC}-in -p icmp -j ACCEPT
+
+echo
+
+#
+# ******************************
+# * filter-${NIC}-tcp-in Rules *
+# ******************************
+#
+
+printInfo 'Refer to sshguard for incoming SSH TCP request packets'
+$IPTABLES -A filter-${NIC}-tcp-in -p tcp -m tcp --dport 22 -j sshguard
+
+printInfo 'Perform TCP INPUT traffic accounting'
+$IPTABLES -A filter-${NIC}-tcp-in -j ACCEPT
 
 echo
 
@@ -605,14 +642,34 @@ echo
 # ═══════════════════════ Configure FILTER OUTPUT Chain ═══════════════════════
 #
 
+# Create OUTPUT filter chains for each network interface
+# ¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯¯
+
+## NIC
+printInfo "Process outgoing $NIC interface traffic"
+$IPTABLES -N filter-${NIC}-out
+$IPTABLES -A OUTPUT -o ${NIC} -j filter-${NIC}-out
+
+## lo
+printInfo 'ACCEPT outgoing lo interface traffic'
+$IPTABLES -A OUTPUT -o lo -j ACCEPT
+
+echo
+
+#
+# ***************************
+# * filter-${NIC}-out Rules *
+# ***************************
+#
+
 printInfo 'Perform TCP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p tcp -j ACCEPT
+$IPTABLES -A filter-${NIC}-out -p tcp -j ACCEPT
 
 printInfo 'Perform UDP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p udp -j ACCEPT
+$IPTABLES -A filter-${NIC}-out -p udp -j ACCEPT
 
 printInfo 'Perform ICMP OUTPUT traffic accounting'
-$IPTABLES -A OUTPUT -o $NIC -p icmp -j ACCEPT
+$IPTABLES -A filter-${NIC}-out -p icmp -j ACCEPT
 
 echo
 

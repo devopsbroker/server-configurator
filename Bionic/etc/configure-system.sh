@@ -234,7 +234,11 @@ if [ "$INSTALL_CONFIG" == 'true' ]; then
 fi
 
 installConfig 'common-session' "$SCRIPT_DIR"/pam.d /etc/pam.d
-installConfig 'sshd_config' "$SCRIPT_DIR"/ssh /etc/ssh 'ssh'
+
+# Manage sshd_config only if called from command line
+if [ $SHLVL -eq 1 ]; then
+	installConfig 'sshd_config' "$SCRIPT_DIR"/ssh /etc/ssh 'ssh'
+fi
 
 if [ ! -f /etc/sudoers.d/10-umask ]; then
 	printInfo 'Installing /etc/sudoers.d/10-umask'

@@ -530,7 +530,11 @@ fi
 installConfig 'sshd_config' "$SCRIPT_DIR"/etc/ssh /etc/ssh 'ssh'
 
 if [ "${ADMIN_USER-}" ]; then
-	printNotice $SCRIPT_EXEC "Please logout and SSH back in as '$ADMIN_USER'"
+	if [ "${SSH_CLIENT-}" ]; then
+		printNotice $SCRIPT_EXEC "Please logout and SSH back in as '$ADMIN_USER'"
+	else
+		printNotice $SCRIPT_EXEC "Please logout and log back in as '$ADMIN_USER'"
+	fi
 	echo
 fi
 

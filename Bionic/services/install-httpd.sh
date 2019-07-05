@@ -49,6 +49,13 @@ fi
 
 ${FUNC_CONFIG?"[1;91mCannot load '/etc/devops/functions.conf': No such file[0m"}
 
+# Load /etc/devops/functions-admin.conf if FUNC_ADMIN_CONFIG is unset
+if [ -z "$FUNC_ADMIN_CONFIG" ] && [ -f /etc/devops/functions-admin.conf ]; then
+	source /etc/devops/functions-admin.conf
+fi
+
+${FUNC_ADMIN_CONFIG?"[1;91mCannot load '/etc/devops/functions-admin.conf': No such file[0m"}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set -o errexit                 # Exit if any statement returns a non-true value
@@ -70,6 +77,7 @@ fi
 ################################## Variables ##################################
 
 ## Bash exec variables
+EXEC_A2ENMOD=/usr/sbin/a2enmod
 EXEC_A2ENSITE=/usr/sbin/a2ensite
 EXEC_A2DISSITE=/usr/sbin/a2dissite
 EXEC_APACHE2CTL=/usr/sbin/apache2ctl
@@ -109,12 +117,56 @@ fi
 
 echo
 
+echo "${bold}${green}Will this website use CGI scripts? ${white}"
+select cgiOption in 'Yes' 'No'; do
+	if [ "$cgiOption" == 'Yes' ]; then
+		cgiOption='+ExecCGI'
+		break;
+	elif [ "$cgiOption" == 'No' ]; then
+		cgiOption='-ExecCGI'
+		break;
+	fi
+done
+
+echo
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Installation ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Install apache2
+#
+# Install Apache2 HTTPD server and mod-security module with OWASP ModSecurity Core Rule Set
+#
 printBanner 'Installing apache2'
 $EXEC_APT -y install apache2
 echo
+
+printBanner 'Installing libapache2-mod-security2'
+$EXEC_APT -y install libapache2-mod-security2
+echo
+
+printBanner 'Installing modsecurity-crs'
+$EXEC_APT -y install modsecurity-crs
+echo
+
+#
+# Install Apache2 Global and Security configuration files
+#
+installConfig 'apache2.conf' "$SCRIPT_DIR/etc/apache2" /etc/apache2
+installConfig 'security.conf' "$SCRIPT_DIR/etc/apache2/conf-available" /etc/apache2/conf-available
+
+#
+# Enable mod_headers / mod_http2 / mod_security / mod_ssl
+#
+printInfo 'Enabling mod_headers'
+$EXEC_A2ENMOD headers
+
+printInfo 'Enabling mod_http2'
+$EXEC_A2ENMOD http2
+
+printInfo 'Enabling mod_security'
+$EXEC_A2ENMOD security2
+
+printInfo 'Enabling mod_ssl'
+$EXEC_A2ENMOD ssl
 
 # Enable httpd firewall settings
 printBanner 'Enabling httpd firewall settings'
@@ -156,6 +208,7 @@ printInfo 'Generating Virtual Host configuration block'
 
 /bin/cat << EOF > /etc/apache2/sites-available/${DNS_NAME}.conf
 <VirtualHost *:80>
+    Options ${cgiOption}
     ServerAdmin admin@${DNS_NAME}
     ServerName ${DNS_NAME}
     ServerAlias www.${DNS_NAME}
@@ -163,6 +216,20 @@ printInfo 'Generating Virtual Host configuration block'
     ErrorLog \${APACHE_LOG_DIR}/error.log
     CustomLog \${APACHE_LOG_DIR}/access.log combined
 </VirtualHost>
+
+#<VirtualHost *:443>
+#    Options ${cgiOption}
+#    ServerAdmin admin@${DNS_NAME}
+#    ServerName ${DNS_NAME}
+#    ServerAlias www.${DNS_NAME}
+#    DocumentRoot /var/www/${DNS_NAME}/html
+#    ErrorLog \${APACHE_LOG_DIR}/error.log
+#    CustomLog \${APACHE_LOG_DIR}/access.log combined
+#    SSLEngine on
+#    SSLCertificateKeyFile /etc/ssl/private/private.pem
+#    SSLCertificateFile /etc/ssl/certs/cert.pem
+#    Protocols h2 http/1.1
+#</VirtualHost>
 
 EOF
 

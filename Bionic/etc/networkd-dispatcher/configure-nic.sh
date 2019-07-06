@@ -69,6 +69,13 @@ fi
 
 ${FUNC_CONFIG?"[1;91mCannot load '/etc/devops/functions.conf': No such file[0m"}
 
+# Load /etc/devops/functions-net.conf if FUNC_NET_CONFIG is unset
+if [ -z "$FUNC_NET_CONFIG" ] && [ -f /etc/devops/functions-net.conf ]; then
+	source /etc/devops/functions-net.conf
+fi
+
+${FUNC_NET_CONFIG?"[1;91mCannot load '/etc/devops/functions-net.conf': No such file[0m"}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set -o errexit                 # Exit if any statement returns a non-true value
@@ -93,7 +100,7 @@ fi
 EXEC_NETTUNER=/usr/local/bin/nettuner
 
 ## Options
-NIC="${1:-$($EXEC_IP -4 route show default | $EXEC_SORT -k9 -n | $EXEC_HEAD -1 | $EXEC_AWK '{print $5}')}"
+NIC="${1:-}"
 
 ## Variables
 export TMPDIR=${TMPDIR:-'/tmp'}
@@ -110,13 +117,20 @@ printBox "DevOpsBroker $UBUNTU_RELEASE Network Interface Configurator" 'true'
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Display error if network interface parameter is invalid
-if [ ! -L /sys/class/net/$NIC ]; then
-	printError "$SCRIPT_EXEC" "Cannot access '$NIC': No such network interface"
-	echo
-	printUsage "$SCRIPT_EXEC NIC"
+if [ -z "$NIC" ]; then
 
-	exit 1
+	# Get default NIC if not present on command-line
+	NIC="$(getDefaultNIC)"
+
+else
+	# Display error if network interface parameter is invalid
+	if [ ! -L /sys/class/net/$NIC ]; then
+		printError "$SCRIPT_EXEC" "Cannot access '$NIC': No such network interface"
+		echo
+		printUsage "$SCRIPT_EXEC ${gold}[NIC]"
+
+		exit 1
+	fi
 fi
 
 # Exit if default interface is a virtual network device (i.e. bridge, tap, etc)

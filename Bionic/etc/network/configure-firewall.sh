@@ -47,6 +47,13 @@ fi
 
 ${FUNC_CONFIG?"[1;91mCannot load '/etc/devops/functions.conf': No such file[0m"}
 
+# Load /etc/devops/functions-net.conf if FUNC_NET_CONFIG is unset
+if [ -z "$FUNC_NET_CONFIG" ] && [ -f /etc/devops/functions-net.conf ]; then
+	source /etc/devops/functions-net.conf
+fi
+
+${FUNC_NET_CONFIG?"[1;91mCannot load '/etc/devops/functions-net.conf': No such file[0m"}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set -o errexit                 # Exit if any statement returns a non-true value
@@ -101,32 +108,9 @@ IPSET_UPDATE='false'
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-# Find the default NIC if one was not provided as an option
+# Get default NIC if not present on command-line
 if [ -z "$DEFAULT_NIC" ]; then
-	set +o errexit
-	mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^e[a-z0-9]+')
-	set -o errexit
-
-	if [ ${#ethList[@]} -eq 1 ]; then
-		DEFAULT_NIC=(${ethList[0]})
-	else
-		COLUMNS=1
-		validNIC='false'
-		echo "${bold}${yellow}Which Ethernet interface do you want to configure?${white}"
-		select DEFAULT_NIC in ${ethList[@]}; do
-			for nic in ${ethList[@]}; do
-				echo $nic $DEFAULT_NIC
-				if [ "$nic" == "$DEFAULT_NIC" ]; then
-					validNIC='true'
-					break;
-				fi
-			done
-
-			if [ "$validNIC" == 'true' ]; then
-				break;
-			fi
-		done
-	fi
+	DEFAULT_NIC="$(getDefaultNIC)"
 fi
 
 ################################### Actions ###################################

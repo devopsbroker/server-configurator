@@ -73,6 +73,13 @@ fi
 
 ${FUNC_CONFIG?"[1;91mCannot load '/etc/devops/functions.conf': No such file[0m"}
 
+# Load /etc/devops/functions-net.conf if FUNC_NET_CONFIG is unset
+if [ -z "$FUNC_NET_CONFIG" ] && [ -f /etc/devops/functions-net.conf ]; then
+	source /etc/devops/functions-net.conf
+fi
+
+${FUNC_NET_CONFIG?"[1;91mCannot load '/etc/devops/functions-net.conf': No such file[0m"}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set -o errexit                 # Exit if any statement returns a non-true value
@@ -99,7 +106,7 @@ IPTABLES_SAVE=/sbin/iptables-save
 EXEC_DERIVESUBNET=/usr/local/bin/derivesubnet
 
 ## Options
-NIC=${1:-}
+NIC="${1:-}"
 
 ## Variables
 IPv4_ADDRESS=''
@@ -109,19 +116,10 @@ IPv4_INTERNAL=''
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 if [ -z "$NIC" ]; then
-	mapfile -t ethList < <($EXEC_IP -br -4 addr show | $EXEC_GREP -Eo '^en(p|s)[a-z0-9]+')
 
-	if [ ${#ethList[@]} -eq 1 ]; then
-		ethInterface=(${ethList[0]})
-	else
-		COLUMNS=1
-		echo "${bold}${yellow}Which Ethernet interface do you want to configure?${white}"
-		select ethInterface in ${ethList[@]}; do
-			break;
-		done
-	fi
+	# Get default NIC if not present on command-line
+	NIC="$(getDefaultNIC)"
 
-	NIC=$ethInterface
 else
 	# Display error if network interface parameter is invalid
 	if [ ! -L /sys/class/net/$NIC ]; then

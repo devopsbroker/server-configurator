@@ -54,6 +54,13 @@ fi
 
 ${FUNC_IO_CONFIG?"[1;91mCannot load '/etc/devops/functions-io.conf': No such file[0m"}
 
+# Load /etc/devops/functions-net.conf if FUNC_NET_CONFIG is unset
+if [ -z "$FUNC_NET_CONFIG" ] && [ -f /etc/devops/functions-net.conf ]; then
+	source /etc/devops/functions-net.conf
+fi
+
+${FUNC_NET_CONFIG?"[1;91mCannot load '/etc/devops/functions-net.conf': No such file[0m"}
+
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Robustness ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 set -o errexit                 # Exit if any statement returns a non-true value

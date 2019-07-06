@@ -111,13 +111,20 @@ if [ -z "$DEFAULT_NIC" ]; then
 		DEFAULT_NIC=(${ethList[0]})
 	else
 		COLUMNS=1
+		validNIC='false'
 		echo "${bold}${yellow}Which Ethernet interface do you want to configure?${white}"
 		select DEFAULT_NIC in ${ethList[@]}; do
 			for nic in ${ethList[@]}; do
+				echo $nic $DEFAULT_NIC
 				if [ "$nic" == "$DEFAULT_NIC" ]; then
+					validNIC='true'
 					break;
 				fi
 			done
+
+			if [ "$validNIC" == 'true' ]; then
+				break;
+			fi
 		done
 	fi
 fi

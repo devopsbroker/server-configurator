@@ -154,8 +154,14 @@ installConfig 'apache2.conf' "$SCRIPT_DIR/etc/apache2" /etc/apache2
 installConfig 'security.conf' "$SCRIPT_DIR/etc/apache2/conf-available" /etc/apache2/conf-available
 
 #
-# Enable mod_headers / mod_http2 / mod_security / mod_ssl
+# Enable mod_cgid / mod_headers / mod_http2 / mod_security / mod_ssl
 #
+
+if [ "$cgiOption" == '+ExecCGI' ]; then
+	printInfo 'Enabling mod_cgid'
+	$EXEC_A2ENMOD cgid
+fi
+
 printInfo 'Enabling mod_headers'
 $EXEC_A2ENMOD headers
 
@@ -177,6 +183,11 @@ echo
 if [ ! -d /var/www/${DNS_NAME}/html ]; then
 	printInfo "Creating Virtual Host directory /var/www/${DNS_NAME}/html"
 	$EXEC_MKDIR --parents /var/www/${DNS_NAME}/html
+fi
+
+if [ "$cgiOption" == '+ExecCGI' ] && [ ! -d /var/www/${DNS_NAME}/cgi ]; then
+	printInfo "Creating Virtual Host directory /var/www/${DNS_NAME}/cgi"
+	$EXEC_MKDIR --parents /var/www/${DNS_NAME}/cgi
 fi
 
 # Generate sample index.html
@@ -209,6 +220,7 @@ printInfo 'Generating Virtual Host configuration block'
 /bin/cat << EOF > /etc/apache2/sites-available/${DNS_NAME}.conf
 <VirtualHost *:80>
     Options ${cgiOption}
+	ScriptAlias "/cgi-bin/" "/var/www/${DNS_NAME}/cgi"
     ServerAdmin admin@${DNS_NAME}
     ServerName ${DNS_NAME}
     ServerAlias www.${DNS_NAME}
@@ -219,6 +231,7 @@ printInfo 'Generating Virtual Host configuration block'
 
 #<VirtualHost *:443>
 #    Options ${cgiOption}
+#    ScriptAlias "/cgi-bin/" "/var/www/${DNS_NAME}/cgi"
 #    ServerAdmin admin@${DNS_NAME}
 #    ServerName ${DNS_NAME}
 #    ServerAlias www.${DNS_NAME}
@@ -236,6 +249,7 @@ EOF
 # Update file and directory security
 printInfo 'Updating file and directory security'
 $EXEC_CHOWN --changes -R $SUDO_USER:$SUDO_USER /var/www/${DNS_NAME}/html
+$EXEC_CHOWN --changes -R $SUDO_USER:$SUDO_USER /var/www/${DNS_NAME}/cgi
 $EXEC_CHMOD --changes -R 755 /var/www/${DNS_NAME}
 
 # Enable new Virtual Host configuration block

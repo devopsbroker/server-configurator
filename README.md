@@ -13,7 +13,7 @@ The DevOpsBroker Ubuntu 18.04 Server Configurator is a complete turn-key solutio
 
 2. Install Ubuntu 18.04 Server
 
-3. Download the latest release of [server-configurator](https://github.com/devopsbroker/desktop-configurator/releases/download/2.2.0/desktop-configurator_2.2.0_amd64.deb) and its [SHA256 Checksum](https://github.com/devopsbroker/desktop-configurator/releases/download/2.2.0/SHA256SUM)
+3. Download the latest release of [server-configurator](https://github.com/devopsbroker/server-configurator/releases/download/1.0.0/server-configurator_1.0.0_amd64.deb) and its [SHA256 Checksum](https://github.com/devopsbroker/server-configurator/releases/download/1.0.0/SHA256SUM)
 
 4. Verify the **server-configurator** package against its SHA256 checksum
 

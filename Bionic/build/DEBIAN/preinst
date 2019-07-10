@@ -1,0 +1,109 @@
+#!/bin/sh
+
+#
+# preinst - DevOpsBroker pre-installation package maintainer script for Ubuntu 18.04 Server
+#
+# Copyright (C) 2019 Edward Smith <edwardsmith@devopsbroker.org>
+#
+# This program is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# This program is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+# details.
+#
+# You should have received a copy of the GNU General Public License along with
+# this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# -----------------------------------------------------------------------------
+# Developed on Ubuntu 18.04.2 LTS running kernel.osrelease = 4.18.0-25
+#
+# The pre-installation script can be called the following ways:
+#   o preinst install
+#   o preinst install <old-verison>
+#   o preinst upgrade <old-version>
+#   o preinst abort-upgrade <new-version>
+#
+# See https://wiki.debian.org/MaintainerScripts for more information.
+# -----------------------------------------------------------------------------
+#
+
+set -e
+
+################################## Variables ##################################
+
+## Options
+command="$1"
+oldVersion="$2"
+
+## Variables
+currentVersion='1.0.0'
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ OPTION Parsing ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+# Display usage if no parameters given
+if [ -z "$command" ]; then
+	echo "[1mUsage: [93mpreinst { abort-upgrade | install | upgrade }[0m"
+	exit 1
+fi
+
+# Display error if invalid command
+if [ "$command" != 'abort-upgrade' ] && [ "$command" != 'install' ] && [ "$command" != 'upgrade' ]; then
+	echo "[1mpreinst: [91mInvalid command: '$command'[0m"
+	echo
+	echo "[1mUsage: [93mpreinst { abort-upgrade | install | upgrade }[0m"
+
+	exit 1
+fi
+
+# Check which version of Ubuntu is installed
+DISTRO_INFO="$(lsb_release -sirc | tr '\n' ' ')"
+
+# Display error if not running on Ubuntu 18.04 bionic
+if [ "$DISTRO_INFO" != 'Ubuntu 18.04 bionic ' ]; then
+	echo "[1mpreinst: [91mInvalid Linux distribution: '$DISTRO_INFO'[0m"
+	echo
+	echo "[1mNote: [93mThis version of server-configurator is only applicable for Ubuntu 18.04 bionic[0m"
+
+	exit 1
+fi
+
+################################### Actions ###################################
+
+if [ "$command" = 'install' ] || [ "$command" = 'upgrade' ]; then
+
+	# Display error if invalid old-version
+	if [ ! -z "$oldVersion" ] && [ "$oldVersion" \> "$currentVersion" ]; then
+		echo "[1mpreinst: [91mInvalid old-version parameter: '$oldVersion'[0m"
+		echo
+		echo "[1mUsage: [93mpreinst $command [OLD_VERSION][0m"
+
+		exit 1
+	fi
+
+	# Add devops group
+	if [ -z "$(getent group devops)" ]; then
+		addgroup 'devops'
+	fi
+
+	# Add user to devops group
+	pkgInstallUser="$USER"
+	if [ ! -z "$SUDO_USER" ]; then
+		pkgInstallUser="$SUDO_USER"
+	fi
+
+	echo "Package Install User: $pkgInstallUser"
+
+	if [ ! -z "$pkgInstallUser" ] && [ "$pkgInstallUser" != 'root' ]; then
+		userGroupList=$(groups "$pkgInstallUser")
+
+		if [ -z "$(echo $userGroupList | grep -Eo '\bdevops\b')" ]; then
+			adduser "$pkgInstallUser" 'devops'
+		fi
+	fi
+fi
+
+exit 0

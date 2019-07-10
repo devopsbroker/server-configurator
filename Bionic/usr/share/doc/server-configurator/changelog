@@ -1,0 +1,19 @@
+server-configurator (1.0.0) bionic; urgency=medium
+
+  [ Edward Smith ]
+  * Configures IPv4 firewall and IPv6 firewall using iptables and ip6tables
+  * Installs all DevOpsBroker system administration and user utilities
+  * Installs a number of useful applications, libraries and utilities
+  * Configures and optimizes the filesystem
+  * Performs Linux kernel tuning optimizations
+  * Performs general system configuration
+  * Configures the fastest APT sources mirror
+  * Configures and optimizes GRUB
+  * Manages DevOpsBroker configuration files (e.g. ansi.conf)
+  * Tunes the default network interface card
+  * Configures systemwide security configuration
+  * Configures the Disk I/O schedulers and tunes each disk independently
+  * Replaces dnsmasq with unbound for the local DNS cache server
+  * Performs user configuration
+
+ -- Edward Smith <edwardsmith@devopsbroker.org>  Wed, 10 Jul 2019 12:15:22 -0500

@@ -60,10 +60,10 @@ fi
 IS_SERVER="$(/usr/bin/dpkg -l ubuntu-minimal 2>&1 | /bin/grep -c ^ii || true)"
 
 # Display error if not running on Ubuntu Server
-if [ $IS_SERVER -eq 0 ]; then
-	printError $scriptName "Invalid Ubuntu version: Not Ubuntu Server"
-	exit 1
-fi
+#if [ $IS_SERVER -eq 0 ]; then
+#	printError $scriptName "Invalid Ubuntu version: Not Ubuntu Server"
+#	exit 1
+#fi
 
 ################################## Functions ##################################
 

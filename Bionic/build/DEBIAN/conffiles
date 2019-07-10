@@ -1,0 +1,6 @@
+/etc/devops/ansi.conf
+/etc/devops/exec.conf
+/etc/devops/functions-admin.conf
+/etc/devops/functions-io.conf
+/etc/devops/functions-net.conf
+/etc/devops/functions.conf

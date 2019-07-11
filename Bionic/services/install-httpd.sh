@@ -154,13 +154,36 @@ installConfig 'apache2.conf' "$SCRIPT_DIR/etc/apache2" /etc/apache2
 installConfig 'security.conf' "$SCRIPT_DIR/etc/apache2/conf-available" /etc/apache2/conf-available
 
 #
-# Enable mod_cgid / mod_headers / mod_http2 / mod_security / mod_ssl
+# Enable mod_cgid / mod_expires / mod_headers / mod_http2 / mod_security / mod_ssl
 #
-
 if [ "$cgiOption" == '+ExecCGI' ]; then
 	printInfo 'Enabling mod_cgid'
 	$EXEC_A2ENMOD cgid
 fi
+
+if [ ! -f /etc/apache2/mods-available/expires.conf ]; then
+	printInfo 'Generating /etc/apache2/mods-available/expires.conf'
+
+/bin/cat << EOF > /etc/apache2/mods-available/expires.conf
+<IfModule mod_expires.c>
+	# Turn on the module.
+	ExpiresActive on
+	# Set the default expiry times.
+	ExpiresDefault "access plus 4 hours"
+	ExpiresByType image/jpg "access plus 1 day"
+	ExpiresByType image/gif "access plus 1 day"
+	ExpiresByType image/jpeg "access plus 1 day"
+	ExpiresByType image/png "access plus 1 day"
+	ExpiresByType image/ico "access plus 1 month"
+	ExpiresByType image/x-icon "access plus 1 month"
+</IfModule>
+
+EOF
+
+fi
+
+printInfo 'Enabling mod_expires'
+$EXEC_A2ENMOD expires
 
 printInfo 'Enabling mod_headers'
 $EXEC_A2ENMOD headers
